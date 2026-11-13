@@ -60,6 +60,22 @@ for i in $(seq 1 10); do
 done
 report $ok "10 ejecuciones con verificación OK"
 
+echo "T7. Validación de argumentos (rechaza valores inválidos con código 64)"
+ok=0
+for args in "-w 0" "-w 65" "-q 0" "--seed -1" "--seed 4294967296" "--seed abc"             "--min-ms 10 --max-ms 5" "--opcion-desconocida" "-w"; do
+    # shellcheck disable=SC2086
+    "$BIN" $args > /dev/null 2>&1; code=$?
+    if [ "$code" -ne 64 ]; then
+        echo "    '$args' devolvió $code (se esperaba 64)"; ok=1
+    fi
+done
+report $ok "argumentos inválidos rechazados"
+
+echo "T8. Semilla máxima de 32 bits (regresión LLP64 en Windows)"
+"$BIN" --quiet --seed 4294967295 -r 10 --min-ms 0 --max-ms 0 > "$TMPD"/ts_seed.out; code=$?
+grep -q "Semilla: 4294967295" "$TMPD"/ts_seed.out; a=$?
+report $(( code != 0 || a != 0 )) "--seed 4294967295 aceptada y aplicada"
+
 echo
 echo "Resultado: $PASS pruebas correctas, $FAIL fallidas."
 [ "$FAIL" -eq 0 ]
