@@ -6,11 +6,13 @@
 namespace {
 
 // Convierte `text` a entero validando que sea numérico y esté en [lo, hi].
-bool parseInt(const std::string& option, const std::string& text, long lo, long hi,
-              long& out, std::string& error) {
+// Se usa long long (64 bits garantizados): en Windows (modelo LLP64) `long`
+// tiene solo 32 bits y no puede representar el máximo de --seed (2^32 - 1).
+bool parseInt(const std::string& option, const std::string& text, long long lo,
+              long long hi, long long& out, std::string& error) {
     try {
         std::size_t pos = 0;
-        const long value = std::stol(text, &pos);
+        const long long value = std::stoll(text, &pos);
         if (pos != text.size()) {
             throw std::invalid_argument("resto");
         }
@@ -62,7 +64,7 @@ bool parseArgs(int argc, char** argv, Config& cfg, std::string& error) {
         }
 
         const std::string value = argv[++i];
-        long n = 0;
+        long long n = 0;
 
         if (arg == "-w" || arg == "--workers") {
             if (!parseInt(arg, value, 1, kMaxWorkers, n, error)) return false;
@@ -86,7 +88,7 @@ bool parseArgs(int argc, char** argv, Config& cfg, std::string& error) {
             if (!parseInt(arg, value, 0, 1000000, n, error)) return false;
             cfg.raceWindowUs = static_cast<int>(n);
         } else {  // --seed
-            if (!parseInt(arg, value, 0, 4294967295L, n, error)) return false;
+            if (!parseInt(arg, value, 0, 4294967295LL, n, error)) return false;
             cfg.seed = static_cast<unsigned>(n);
         }
     }
