@@ -6,5 +6,7 @@ ticketstorm_tsan
 ticketstorm_tsan.exe
 unit_tests
 unit_tests.exe
+bench_inventory
+bench_inventory.exe
 *.o
 *.d
