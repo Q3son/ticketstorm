@@ -16,8 +16,11 @@ EXE := .exe
 endif
 BIN     := ticketstorm$(EXE)
 BIN_TSAN := ticketstorm_tsan$(EXE)
+UNIT_BIN := unit_tests$(EXE)
+TEST_SRCS := $(wildcard tests/*.cpp)
+LIB_OBJS := $(filter-out $(OBJ_DIR)/main.o,$(OBJS))
 
-.PHONY: all tsan test run clean
+.PHONY: all tsan unit test run clean
 
 all: $(BIN)
 
@@ -36,14 +39,21 @@ tsan: $(BIN_TSAN)
 $(BIN_TSAN): $(SRCS)
 	$(CXX) -std=c++17 -g -O1 -Wall -Wextra -pthread -fsanitize=thread -Iinclude $(SRCS) -o $@
 
-# Plan de pruebas automatizado (Tabla 4 del documento).
-test: $(BIN)
+# Pruebas unitarias de TicketInventory y Logger.
+$(UNIT_BIN): $(LIB_OBJS) $(TEST_SRCS)
+	$(CXX) $(CXXFLAGS) -Iinclude $(TEST_SRCS) $(LIB_OBJS) $(LDFLAGS) -o $@
+
+unit: $(UNIT_BIN)
+	./$(UNIT_BIN)
+
+# Plan de pruebas automatizado (Tabla 4 del documento) + pruebas unitarias.
+test: $(BIN) unit
 	bash scripts/run_tests.sh ./$(BIN)
 
 run: $(BIN)
 	./$(BIN)
 
 clean:
-	rm -rf $(OBJ_DIR) $(BIN) $(BIN_TSAN)
+	rm -rf $(OBJ_DIR) $(BIN) $(BIN_TSAN) $(UNIT_BIN)
 
 -include $(DEPS)

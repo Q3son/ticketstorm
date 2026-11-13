@@ -4,5 +4,7 @@ ticketstorm
 ticketstorm.exe
 ticketstorm_tsan
 ticketstorm_tsan.exe
+unit_tests
+unit_tests.exe
 *.o
 *.d
