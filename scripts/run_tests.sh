@@ -3,6 +3,9 @@
 BIN="${1:-./ticketstorm}"
 PASS=0
 FAIL=0
+# Directorio temporal propio (portable: Linux, macOS y Git Bash en Windows).
+TMPD="$(mktemp -d 2>/dev/null || mktemp -d -t ticketstorm)"
+trap 'rm -rf "$TMPD"' EXIT
 
 report() {  # report <0|1> <descripción>
     if [ "$1" -eq 0 ]; then
@@ -33,10 +36,10 @@ report $(( code != 0 || a != 0 )) "Workers ociosos se bloquean en la condition_v
 echo "T4. Versión SIN mutex en el contador (debe aparecer una venta de más)"
 found=1
 for i in $(seq 1 20); do
-    "$BIN" --no-sync --quiet -w 8 -q 5 -t 100 -r 2000 --min-ms 0 --max-ms 0 > /tmp/ts_nosync.out
-    if [ $? -eq 1 ] && grep -q "CONDICIÓN DE CARRERA DETECTADA" /tmp/ts_nosync.out; then
+    "$BIN" --no-sync --quiet -w 8 -q 5 -t 100 -r 2000 --min-ms 0 --max-ms 0 > "$TMPD"/ts_nosync.out
+    if [ $? -eq 1 ] && grep -q "CONDICIÓN DE CARRERA DETECTADA" "$TMPD"/ts_nosync.out; then
         found=0; echo "    carrera observada en el intento $i:"
-        grep -E "Entradas vendidas|Verificación" /tmp/ts_nosync.out | sed 's/^/    /'
+        grep -E "Entradas vendidas|Verificación" "$TMPD"/ts_nosync.out | sed 's/^/    /'
         break
     fi
 done
@@ -45,15 +48,15 @@ report $found "se detectó condición de carrera sin sincronización"
 echo "T5. Versión CON mutex (las entradas vendidas nunca superan las disponibles)"
 ok=0
 for i in $(seq 1 5); do
-    "$BIN" --quiet -w 8 -q 5 -t 100 -r 2000 --min-ms 0 --max-ms 0 > /tmp/ts_sync.out || ok=1
+    "$BIN" --quiet -w 8 -q 5 -t 100 -r 2000 --min-ms 0 --max-ms 0 > "$TMPD"/ts_sync.out || ok=1
 done
 report $ok "5 ejecuciones intensivas sin ventas de más"
 
 echo "T6. Repetir 10 ejecuciones (resultado consistente)"
 ok=0
 for i in $(seq 1 10); do
-    "$BIN" --quiet --seed 42 --min-ms 5 --max-ms 20 > /tmp/ts_rep.out || ok=1
-    grep -q "Verificación: OK" /tmp/ts_rep.out || ok=1
+    "$BIN" --quiet --seed 42 --min-ms 5 --max-ms 20 > "$TMPD"/ts_rep.out || ok=1
+    grep -q "Verificación: OK" "$TMPD"/ts_rep.out || ok=1
 done
 report $ok "10 ejecuciones con verificación OK"
 

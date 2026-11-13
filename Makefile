@@ -9,8 +9,13 @@ OBJ_DIR := build
 SRCS    := $(wildcard $(SRC_DIR)/*.cpp)
 OBJS    := $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 DEPS    := $(OBJS:.o=.d)
-BIN     := ticketstorm
-BIN_TSAN := ticketstorm_tsan
+# En Windows (MinGW/MSYS2) el enlazador añade .exe; se refleja en el nombre
+# del objetivo para que make no reenlace en cada invocación.
+ifeq ($(OS),Windows_NT)
+EXE := .exe
+endif
+BIN     := ticketstorm$(EXE)
+BIN_TSAN := ticketstorm_tsan$(EXE)
 
 .PHONY: all tsan test run clean
 
