@@ -1,0 +1,8 @@
+# Artefactos de compilación
+build/
+ticketstorm
+ticketstorm.exe
+ticketstorm_tsan
+ticketstorm_tsan.exe
+*.o
+*.d
