@@ -54,6 +54,10 @@ bool parseArgs(int argc, char** argv, Config& cfg, std::string& error) {
             cfg.quiet = true;
             continue;
         }
+        if (arg == "--timestamps") {
+            cfg.timestamps = true;
+            continue;
+        }
 
         // Opciones con valor.
         const bool withValue = arg == "-w" || arg == "--workers" || arg == "-q" ||
@@ -141,6 +145,7 @@ void printUsage(const char* program) {
         << "      --atomic        Atajo de --sync-mode atomic (compare_exchange, sin cerrojo)\n"
         << "      --no-sync       Atajo de --sync-mode none (condición de carrera)\n"
         << "      --quiet         Solo imprime cabecera y resumen final\n"
+        << "      --timestamps    Antepone a cada traza el tiempo transcurrido (ms)\n"
         << "      --seed N        Semilla de las peticiones (0 = aleatoria) [0]\n"
         << "  -h, --help          Muestra esta ayuda\n\n"
         << "Código de salida: 0 = OK, 1 = condición de carrera detectada, "

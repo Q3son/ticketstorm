@@ -18,7 +18,7 @@ int Simulation::run() {
     const unsigned baseSeed =
         config_.seed != 0 ? config_.seed : std::random_device{}();
 
-    Logger          logger(!config_.quiet);
+    Logger          logger(!config_.quiet, config_.timestamps);
     RequestQueue    queue(config_.queueCapacity);
     TicketInventory inventory(config_.totalTickets, config_.syncMode,
                               config_.raceWindowUs);

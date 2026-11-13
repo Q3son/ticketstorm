@@ -22,6 +22,7 @@ struct Config {
     int         raceWindowUs  = 200;   // ventana entre verificar y descontar stock
     SyncMode    syncMode      = SyncMode::Mutex;  // estrategia del contador
     bool        quiet         = false; // true => solo imprime el resumen final
+    bool        timestamps    = false; // true => trazas con marca de tiempo (ms)
     bool        showHelp      = false;
     unsigned    seed          = 0;     // 0 => semilla aleatoria
 };
