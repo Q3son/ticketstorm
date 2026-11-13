@@ -20,7 +20,7 @@ int Simulation::run() {
 
     Logger          logger(!config_.quiet);
     RequestQueue    queue(config_.queueCapacity);
-    TicketInventory inventory(config_.totalTickets, config_.synchronized,
+    TicketInventory inventory(config_.totalTickets, config_.syncMode,
                               config_.raceWindowUs);
 
     {
@@ -30,8 +30,7 @@ int Simulation::run() {
            << " | Capacidad de cola: " << config_.queueCapacity
            << " | Entradas: " << config_.totalTickets
            << " | Peticiones: " << config_.totalRequests << '\n'
-           << "Modo: " << (config_.synchronized ? "CON sincronización (mutex)"
-                                                : "SIN sincronización (mutex omitido)")
+           << "Modo: " << describe(config_.syncMode)
            << " | Semilla: " << baseSeed << '\n';
         logger.always(os.str());
     }

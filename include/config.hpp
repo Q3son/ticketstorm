@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <string>
 
+#include "sync_mode.hpp"
+
 // Límites del modelo de simulación (según el documento: 1 a 4 entradas).
 constexpr int kMinTicketsPerRequest = 1;
 constexpr int kMaxTicketsPerRequest = 4;
@@ -18,7 +20,7 @@ struct Config {
     int         minProcessMs  = 50;    // duración mínima del "procesamiento"
     int         maxProcessMs  = 150;   // duración máxima del "procesamiento"
     int         raceWindowUs  = 200;   // ventana entre verificar y descontar stock
-    bool        synchronized  = true;  // false => versión SIN mutex (extra 5.8)
+    SyncMode    syncMode      = SyncMode::Mutex;  // estrategia del contador
     bool        quiet         = false; // true => solo imprime el resumen final
     bool        showHelp      = false;
     unsigned    seed          = 0;     // 0 => semilla aleatoria
