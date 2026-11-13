@@ -14,8 +14,9 @@
 
 namespace {
 
-int g_checks = 0;
-int g_failures = 0;
+// Atómicos: CHECK también se usa dentro de hilos concurrentes (U4-U7).
+std::atomic<int> g_checks{0};
+std::atomic<int> g_failures{0};
 
 #define CHECK(cond)                                                              \
     do {                                                                         \
@@ -166,6 +167,7 @@ int main() {
     run("U9  logger: marcas de tiempo con formato y orden", loggerTimestamps);
     run("U10 nombres de SyncMode", syncModeNames);
 
-    std::cout << "\nComprobaciones: " << g_checks << ", fallidas: " << g_failures << '\n';
-    return g_failures == 0 ? 0 : 1;
+    std::cout << "\nComprobaciones: " << g_checks.load() << ", fallidas: " << g_failures.load()
+              << '\n';
+    return g_failures.load() == 0 ? 0 : 1;
 }
