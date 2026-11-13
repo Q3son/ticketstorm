@@ -62,7 +62,8 @@ report $ok "10 ejecuciones con verificación OK"
 
 echo "T7. Validación de argumentos (rechaza valores inválidos con código 64)"
 ok=0
-for args in "-w 0" "-w 65" "-q 0" "--seed -1" "--seed 4294967296" "--seed abc"             "--min-ms 10 --max-ms 5" "--opcion-desconocida" "-w"; do
+for args in "-w 0" "-w 65" "-q 0" "--seed -1" "--seed 4294967296" "--seed abc"             "--min-ms 10 --max-ms 5" "--opcion-desconocida" "-w" \
+            "--sync-mode foo" "--atomic --no-sync"; do
     # shellcheck disable=SC2086
     "$BIN" $args > /dev/null 2>&1; code=$?
     if [ "$code" -ne 64 ]; then
@@ -75,6 +76,19 @@ echo "T8. Semilla máxima de 32 bits (regresión LLP64 en Windows)"
 "$BIN" --quiet --seed 4294967295 -r 10 --min-ms 0 --max-ms 0 > "$TMPD"/ts_seed.out; code=$?
 grep -q "Semilla: 4294967295" "$TMPD"/ts_seed.out; a=$?
 report $(( code != 0 || a != 0 )) "--seed 4294967295 aceptada y aplicada"
+
+echo "T9. Modo atómico (compare_exchange): nunca vende de más"
+ok=0
+for i in $(seq 1 5); do
+    "$BIN" --atomic --quiet -w 8 -q 5 -t 100 -r 2000 --min-ms 0 --max-ms 0 > "$TMPD"/ts_atomic.out || ok=1
+    grep -q "atómica" "$TMPD"/ts_atomic.out || ok=1
+done
+report $ok "5 ejecuciones intensivas en modo atómico sin ventas de más"
+
+echo "T10. Marcas de tiempo en las trazas (--timestamps)"
+"$BIN" --timestamps --seed 5 -r 5 --min-ms 0 --max-ms 0 > "$TMPD"/ts_time.out; code=$?
+grep -Eq '^\[ *[0-9]+\.[0-9]{3} ms\] \[(Worker|Dispatcher)' "$TMPD"/ts_time.out; a=$?
+report $(( code != 0 || a != 0 )) "las trazas llevan el tiempo transcurrido en ms"
 
 echo
 echo "Resultado: $PASS pruebas correctas, $FAIL fallidas."
