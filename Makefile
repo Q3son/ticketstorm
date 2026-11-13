@@ -21,7 +21,7 @@ BENCH_BIN := bench_inventory$(EXE)
 TEST_SRCS := $(wildcard tests/*.cpp)
 LIB_OBJS := $(filter-out $(OBJ_DIR)/main.o,$(OBJS))
 
-.PHONY: all tsan unit bench test run clean
+.PHONY: all tsan unit bench gui test run clean
 
 all: $(BIN)
 
@@ -53,6 +53,10 @@ $(BENCH_BIN): $(LIB_OBJS) bench/bench_inventory.cpp
 
 bench: $(BENCH_BIN)
 	./$(BENCH_BIN)
+
+# Trazas de demostración para el visualizador (abrir gui/index.html).
+gui: $(BIN)
+	bash scripts/gen_gui_traces.sh ./$(BIN)
 
 # Plan de pruebas automatizado (Tabla 4 del documento) + pruebas unitarias.
 test: $(BIN) unit

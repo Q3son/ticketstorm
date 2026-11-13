@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TicketStorm · Visualizador</title>
+<style>
+:root {
+  --bg: #0b1020; --bg2: #11182c; --panel: #151d33; --panel2: #1b2541; --line: #2a3658;
+  --ink: #e8ecf6; --ink2: #a8b3cf; --ink3: #6f7c9c;
+  --accent: #7c9cff;
+  --run: #4f8cff; --mutexwait: #f5a524; --cs: #a970ff; --cvwait: #7a86a6; --proc: #22c3a6;
+  --done: #3a4566; --race: #ff4d5e; --ok: #2fd27a; --cas: #ff8a3d;
+  --chip1: #4f8cff; --chip2: #22c3a6; --chip3: #f5a524; --chip4: #ff6b9a;
+  --shadow: 0 8px 24px rgba(0,0,0,.35);
+  --mono: "JetBrains Mono", "Cascadia Code", Consolas, "SFMono-Regular", monospace;
+  --sans: "Segoe UI", "Inter", system-ui, -apple-system, Roboto, sans-serif;
+}
+:root[data-theme="light"] {
+  --bg: #f4f6fb; --bg2: #e9edf6; --panel: #ffffff; --panel2: #f3f5fb; --line: #d6dcea;
+  --ink: #141a2e; --ink2: #49536e; --ink3: #7d879f; --done: #c9d0e0; --cvwait: #8a94ad;
+  --shadow: 0 6px 18px rgba(20,30,60,.10);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.4 var(--sans); overflow-x: hidden; }
+button, select, input { font: inherit; color: inherit; }
+.app { display: grid; grid-template-rows: auto auto minmax(0,1fr) auto; height: 100vh; gap: 10px; padding: 12px 16px 14px; }
+
+/* ---------- cabecera ---------- */
+header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.logo { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, var(--run), var(--cs)); display: grid; place-items: center; font-weight: 800; color: #fff; }
+.brand h1 { font-size: 18px; margin: 0; letter-spacing: .2px; }
+.brand p { margin: 0; font-size: 12px; color: var(--ink3); }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab { border: 1px solid var(--line); background: var(--panel); padding: 7px 12px; border-radius: 999px; cursor: pointer; font-size: 13px; color: var(--ink2); transition: .15s; }
+.tab:hover { border-color: var(--accent); color: var(--ink); }
+.tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tab kbd { font-family: var(--mono); font-size: 11px; opacity: .7; margin-right: 4px; }
+.iconbtn { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 7px 10px; cursor: pointer; }
+.iconbtn:hover { border-color: var(--accent); }
+
+/* ---------- banda de modo ---------- */
+.modebar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.modebadge { font-weight: 800; letter-spacing: .6px; padding: 6px 12px; border-radius: 8px; font-size: 13px; }
+.modebadge.mutex { background: color-mix(in srgb, var(--cs) 22%, transparent); color: var(--cs); }
+.modebadge.atomic { background: color-mix(in srgb, var(--cas) 22%, transparent); color: var(--cas); }
+.modebadge.none { background: color-mix(in srgb, var(--race) 22%, transparent); color: var(--race); }
+.param { font-size: 12px; color: var(--ink2); background: var(--panel); border: 1px solid var(--line); padding: 4px 9px; border-radius: 999px; }
+.param b { color: var(--ink); font-weight: 600; }
+.scenario-desc { color: var(--ink2); font-size: 13px; margin-left: 4px; }
+
+/* ---------- escenario ---------- */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 12px; min-height: 0; overflow: hidden; }
+.stage { display: grid; grid-template-columns: 210px minmax(0,1fr) 260px; grid-template-rows: minmax(0,1fr) auto; gap: 12px; min-height: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px; box-shadow: var(--shadow); position: relative; }
+.card h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--ink3); font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.sub { color: var(--ink3); font-size: 12px; }
+
+/* hilos */
+.thread { border: 1px solid var(--line); border-radius: 12px; padding: 9px 10px; background: var(--panel2); transition: border-color .2s, box-shadow .2s, background .2s; position: relative; }
+.thread .top { display: flex; align-items: center; gap: 8px; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 12px; color: #fff; background: var(--done); flex: none; transition: background .2s; }
+.thread .name { font-weight: 700; }
+.thread .state { font-size: 12px; color: var(--ink2); }
+.thread .req { margin-top: 6px; min-height: 26px; }
+.thread.st-run .avatar { background: var(--run); }
+.thread.st-mutexwait .avatar { background: var(--mutexwait); }
+.thread.st-cs .avatar { background: var(--cs); }
+.thread.st-cvwait .avatar { background: var(--cvwait); }
+.thread.st-proc .avatar { background: var(--proc); }
+.thread.st-race .avatar { background: var(--race); }
+.thread.st-cas .avatar { background: var(--cas); }
+.thread.st-done { opacity: .5; }
+.thread.active { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+.thread.st-race { border-color: var(--race); }
+.zzz { position: absolute; right: 10px; top: 8px; font-size: 12px; color: var(--ink3); font-family: var(--mono); }
+.workers { display: grid; gap: 8px; align-content: start; overflow: auto; max-height: 100%; }
+.workers .thread { padding: 7px 9px; }
+.workers .thread .req { margin-top: 4px; min-height: 22px; }
+.workers .avatar { width: 26px; height: 26px; font-size: 11px; }
+.workers.two { grid-template-columns: 1fr 1fr; }
+.workers.two .thread .state { font-size: 11px; }
+
+/* chips de petición */
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 8px; font-size: 12px; font-weight: 600; color: #fff; background: var(--chip1); white-space: nowrap; font-family: var(--mono); }
+.chip.q2 { background: var(--chip2); } .chip.q3 { background: var(--chip3); color: #1d1300; } .chip.q4 { background: var(--chip4); }
+.chip .tk { opacity: .85; font-weight: 500; }
+.ghost { position: fixed; z-index: 50; pointer-events: none; box-shadow: var(--shadow); }
+
+/* cola */
+.queuewrap { display: grid; grid-template-rows: auto minmax(0,1fr) auto; gap: 10px; min-height: 0; }
+.room { border: 1px dashed var(--line); border-radius: 12px; padding: 8px 10px; min-height: 58px; transition: border-color .2s, background .2s; }
+.room .label { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink2); margin-bottom: 6px; }
+.room .label code { font-family: var(--mono); color: var(--ink); }
+.room .who { display: flex; gap: 6px; flex-wrap: wrap; min-height: 28px; }
+.mini { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #fff; background: var(--cvwait); }
+.mini.mw { background: var(--mutexwait); } .mini.cs { background: var(--cs); } .mini.race { background: var(--race); } .mini.cas { background: var(--cas); }
+.room.pulse { animation: pulse .7s ease-out; }
+@keyframes pulse { 0% { background: color-mix(in srgb, var(--accent) 35%, transparent); border-color: var(--accent); } 100% { background: transparent; } }
+.notifytag { font-family: var(--mono); font-size: 11px; color: var(--accent); opacity: 0; transition: opacity .2s; }
+.room.pulse .notifytag { opacity: 1; }
+
+.buffer { display: grid; align-content: center; gap: 10px; }
+.bufhead { display: flex; align-items: center; justify-content: space-between; }
+.lock { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink2); }
+.lock svg { width: 14px; height: 14px; }
+.lock.held { border-color: var(--cs); color: var(--cs); }
+.lock.wiggle { animation: wiggle .4s; }
+@keyframes wiggle { 25% { transform: rotate(-6deg); } 75% { transform: rotate(6deg); } }
+.slots { display: grid; gap: 8px; }
+.slot { height: 52px; border-radius: 10px; border: 2px dashed var(--line); display: grid; place-items: center; transition: border-color .2s, background .2s; }
+.slot.full { border-style: solid; border-color: transparent; background: var(--panel2); }
+.slot .idx { font-size: 10px; color: var(--ink3); }
+.fifo { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink3); font-family: var(--mono); }
+.closedtag { color: var(--race); font-weight: 700; font-size: 12px; }
+
+/* inventario */
+.vault { grid-column: 1 / -1; display: grid; grid-template-columns: 220px 1fr 1fr 230px; gap: 14px; align-items: stretch; }
+.stock { text-align: center; display: grid; align-content: center; }
+.stock .num { font-size: 54px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; transition: color .2s; }
+.stock .num.neg { color: var(--race); }
+.stock .num.flip { animation: flip .35s; }
+@keyframes flip { 0% { transform: scale(1.18); } 100% { transform: scale(1); } }
+.bar { height: 10px; background: var(--panel2); border-radius: 999px; overflow: hidden; margin-top: 10px; position: relative; }
+.bar > i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ok); border-radius: 999px; transition: width .3s; }
+.bar.over > i { background: var(--race); }
+.cszone { border: 2px solid var(--line); border-radius: 12px; padding: 8px 10px; transition: border-color .2s, background .2s; }
+.cszone.busy { border-color: var(--cs); }
+.cszone.race { border-color: var(--race); background: color-mix(in srgb, var(--race) 12%, transparent); animation: alarm 1s infinite; }
+@keyframes alarm { 50% { background: color-mix(in srgb, var(--race) 24%, transparent); } }
+.cszone.shake { animation: shake .4s; }
+@keyframes shake { 20%,60% { transform: translateX(-4px); } 40%,80% { transform: translateX(4px); } }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.stat { background: var(--panel2); border-radius: 10px; padding: 6px 9px; }
+.stat .k { font-size: 11px; color: var(--ink3); }
+.stat .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat.bad .v { color: var(--race); }
+
+/* panel lateral */
+.side { display: grid; grid-template-rows: auto auto minmax(0,1fr); gap: 12px; min-height: 0; }
+.narr .concept { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.narr .concept.c-race { background: color-mix(in srgb, var(--race) 20%, transparent); color: var(--race); }
+.narr .concept.c-cas { background: color-mix(in srgb, var(--cas) 20%, transparent); color: var(--cas); }
+.narr .concept.c-cv { background: color-mix(in srgb, var(--cvwait) 25%, transparent); color: var(--ink2); }
+.narr .concept.c-cs { background: color-mix(in srgb, var(--cs) 20%, transparent); color: var(--cs); }
+.narr .text { font-size: 16px; line-height: 1.45; margin-top: 8px; min-height: 92px; }
+.narr .code { font-family: var(--mono); font-size: 12px; color: var(--ink2); margin-top: 6px; background: var(--panel2); padding: 6px 8px; border-radius: 8px; min-height: 30px; }
+.verdict { border-radius: 12px; padding: 10px 12px; font-weight: 700; display: none; }
+.verdict.show { display: block; }
+.verdict.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.verdict.bad { background: color-mix(in srgb, var(--race) 18%, transparent); color: var(--race); }
+.verdict small { display: block; font-weight: 500; color: var(--ink2); margin-top: 3px; }
+.log { overflow: auto; min-height: 0; font-family: var(--mono); font-size: 12px; }
+.log .row { display: grid; grid-template-columns: 54px 38px 1fr; gap: 6px; padding: 3px 6px; border-radius: 6px; cursor: pointer; color: var(--ink2); }
+.log .row:hover { background: var(--panel2); }
+.log .row.cur { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--ink); }
+.log .row.future { opacity: .35; }
+.log .t { color: var(--ink3); text-align: right; }
+.log .th { font-weight: 700; }
+
+/* transporte y línea de tiempo */
+.transport { display: grid; gap: 8px; }
+.controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ctl { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; min-width: 40px; height: 38px; cursor: pointer; display: grid; place-items: center; padding: 0 10px; }
+.ctl:hover { border-color: var(--accent); }
+.ctl.play { background: var(--accent); border-color: var(--accent); color: #fff; min-width: 56px; }
+.ctl svg { width: 18px; height: 18px; fill: currentColor; }
+.scrub { flex: 1; min-width: 160px; accent-color: var(--accent); }
+.pos { font-family: var(--mono); font-size: 12px; color: var(--ink2); min-width: 190px; text-align: right; }
+.opt { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink2); }
+select { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.gantt { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+.gantt canvas { width: 100%; height: 100%; display: block; cursor: pointer; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink2); margin-top: 6px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: -2px; }
+
+.drop { position: fixed; inset: 0; background: color-mix(in srgb, var(--accent) 25%, transparent); border: 3px dashed var(--accent); display: none; place-items: center; font-size: 22px; font-weight: 700; z-index: 100; }
+.drop.show { display: grid; }
+.help { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; place-items: center; z-index: 90; }
+.help.show { display: grid; }
+.help .card { max-width: 560px; }
+.help table { border-collapse: collapse; width: 100%; }
+.help td { padding: 5px 8px; border-bottom: 1px solid var(--line); }
+.help kbd { font-family: var(--mono); background: var(--panel2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
+
+@media (max-width: 1280px) {
+  .app { height: auto; min-height: 100vh; }
+  .main { grid-template-columns: 1fr; overflow: visible; }
+  .side { grid-template-rows: auto auto 260px; }
+}
+@media (max-width: 900px) {
+  .stage { grid-template-columns: 1fr; }
+  .vault { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="logo">TS</div>
+      <div>
+        <h1>TicketStorm · Visualizador de sincronización</h1>
+        <p>Sistemas Operativos — productor-consumidor, mutex, variables de condición y condiciones de carrera</p>
+      </div>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <button class="iconbtn" id="openBtn" title="Abrir una traza generada con --trace">Abrir traza…</button>
+    <input type="file" id="fileIn" accept=".json,application/json" hidden>
+    <button class="iconbtn" id="themeBtn" title="Cambiar tema (T)">◐</button>
+    <button class="iconbtn" id="helpBtn" title="Atajos de teclado (?)">?</button>
+  </header>
+
+  <div class="modebar" id="modebar"></div>
+
+  <div class="main">
+    <div class="stage">
+      <!-- Productor -->
+      <div class="card">
+        <h2>Productor</h2>
+        <div id="producer"></div>
+        <div class="sub" style="margin-top:10px">Genera peticiones y las inserta en la cola. Si la cola está llena, espera en <code>notFull</code>.</div>
+      </div>
+
+      <!-- Cola acotada -->
+      <div class="card queuewrap">
+        <div class="room" id="room-notFull">
+          <div class="label"><span>Sala de espera <code>notFull</code> («hay espacio»)</span><span class="notifytag" id="tag-notFull">notify</span></div>
+          <div class="who" id="who-notFull"></div>
+        </div>
+        <div class="buffer">
+          <div class="bufhead">
+            <h2 style="margin:0">Cola acotada (buffer)</h2>
+            <span id="qinfo" class="sub"></span>
+            <span class="lock" id="qlock"></span>
+          </div>
+          <div class="fifo"><span>← frente (pop)</span><span id="qwaiters"></span><span>final (push) →</span></div>
+          <div class="slots" id="slots"></div>
+        </div>
+        <div class="room" id="room-notEmpty">
+          <div class="label"><span>Sala de espera <code>notEmpty</code> («hay trabajo»)</span><span class="notifytag" id="tag-notEmpty">notify</span></div>
+          <div class="who" id="who-notEmpty"></div>
+        </div>
+      </div>
+
+      <!-- Consumidores -->
+      <div class="card" style="display:grid;grid-template-rows:auto 1fr;min-height:0">
+        <h2>Consumidores (Workers)</h2>
+        <div class="workers" id="workers"></div>
+      </div>
+
+      <!-- Inventario -->
+      <div class="card vault">
+        <div class="stock">
+          <h2 style="justify-content:center">Inventario de entradas</h2>
+          <div class="num" id="stockNum">0</div>
+          <div class="sub" id="stockSub">disponibles</div>
+          <div class="bar" id="soldBar"><i></i></div>
+        </div>
+        <div>
+          <h2>Mutex del inventario <span class="lock" id="ilock"></span></h2>
+          <div class="room" style="min-height:70px">
+            <div class="label"><span id="iwaitLabel">Cola del mutex (bloqueados por el SO)</span></div>
+            <div class="who" id="iwaiters"></div>
+          </div>
+        </div>
+        <div>
+          <h2 id="csTitle">Sección crítica: verificar → descontar</h2>
+          <div class="cszone" id="cszone">
+            <div class="label sub" id="csLabel">Nadie dentro</div>
+            <div class="who" id="csWho" style="margin-top:6px"></div>
+          </div>
+        </div>
+        <div class="stats" id="stats"></div>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="card narr">
+        <h2>¿Qué está pasando?</h2>
+        <span class="concept" id="concept">—</span>
+        <div class="text" id="narr">Presiona <b>Reproducir</b> o la barra espaciadora.</div>
+        <div class="code" id="code"></div>
+      </div>
+      <div class="verdict" id="verdict"></div>
+      <div class="card" style="display:grid;grid-template-rows:auto 1fr;min-height:0">
+        <h2>Registro de eventos</h2>
+        <div class="log" id="log"></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="transport">
+    <div class="controls">
+      <button class="ctl" id="bStart" title="Inicio (Home)"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button class="ctl" id="bPrev" title="Evento anterior (←)"><svg viewBox="0 0 24 24"><path d="M18 5v14L7 12z"/></svg></button>
+      <button class="ctl play" id="bPlay" title="Reproducir / pausa (espacio)"><svg viewBox="0 0 24 24" id="playIcon"><path d="M7 5v14l12-7z"/></svg></button>
+      <button class="ctl" id="bNext" title="Evento siguiente (→)"><svg viewBox="0 0 24 24"><path d="M6 5v14l11-7z"/></svg></button>
+      <button class="ctl" id="bEnd" title="Final (End)"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+      <label class="opt">Velocidad
+        <select id="speed">
+          <option value="0.25">0,25×</option><option value="0.5">0,5×</option><option value="1" selected>1×</option>
+          <option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option>
+        </select>
+      </label>
+      <label class="opt"><input type="checkbox" id="skipQ"> Pasar rápido lock/unlock de la cola</label>
+      <input type="range" class="scrub" id="scrub" min="0" max="0" value="0">
+      <span class="pos" id="pos"></span>
+    </div>
+    <div class="gantt">
+      <div style="height:120px" id="ganttBox"><canvas id="gantt"></canvas></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+</div>
+
+<div class="drop" id="drop">Suelta aquí un archivo de traza (.json)</div>
+<div class="help" id="help">
+  <div class="card">
+    <h2>Atajos para la exposición</h2>
+    <table>
+      <tr><td><kbd>Espacio</kbd></td><td>Reproducir / pausa</td></tr>
+      <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Evento anterior / siguiente</td></tr>
+      <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>Ir al inicio / al final</td></tr>
+      <tr><td><kbd>+</kbd> <kbd>−</kbd></td><td>Más rápido / más lento</td></tr>
+      <tr><td><kbd>1</kbd>–<kbd>4</kbd></td><td>Cambiar de escenario</td></tr>
+      <tr><td><kbd>F</kbd></td><td>Pantalla completa</td></tr>
+      <tr><td><kbd>T</kbd></td><td>Tema claro / oscuro</td></tr>
+      <tr><td><kbd>?</kbd> / <kbd>Esc</kbd></td><td>Mostrar / ocultar esta ayuda</td></tr>
+    </table>
+    <p class="sub">Haz clic en la línea de tiempo o en el registro para saltar a un evento. También puedes arrastrar un archivo generado con <code>./ticketstorm --trace archivo.json</code>.</p>
+  </div>
+</div>
+
+<script src="traces.js"></script>
+<script>
+"use strict";
+/* ======================================================================
+   Datos
+   ====================================================================== */
+const SCENARIOS = [
+  { key: "basico", title: "Productor-consumidor",
+    desc: "Cola pequeña: el Dispatcher se bloquea en notFull y los Workers en notEmpty." },
+  { key: "mutex", title: "Contención con mutex",
+    desc: "Varios Workers compiten por el inventario: el SO bloquea a los que esperan el mutex." },
+  { key: "atomic", title: "Atómico (CAS)",
+    desc: "Sin cerrojo: compare_exchange falla y reintenta cuando otro hilo cambió el stock." },
+  { key: "nosync", title: "Sin sincronización",
+    desc: "Sin mutex varios hilos verifican el mismo stock a la vez: se venden entradas de más." },
+];
+const MODE_LABEL = { mutex: "MUTEX", atomic: "ATÓMICO · CAS", none: "SIN SINCRONIZACIÓN" };
+
+const STATE = {
+  idle:      { label: "Creado",                      cls: "st-done",      color: "--done" },
+  run:       { label: "Ejecutando",                  cls: "st-run",       color: "--run" },
+  mutexwait: { label: "Bloqueado esperando mutex",   cls: "st-mutexwait", color: "--mutexwait" },
+  csq:       { label: "Sección crítica (cola)",      cls: "st-cs",        color: "--cs" },
+  csi:       { label: "Sección crítica (inventario)",cls: "st-cs",        color: "--cs" },
+  cvwait:    { label: "Bloqueado en wait()",         cls: "st-cvwait",    color: "--cvwait" },
+  proc:      { label: "Procesando (sleep)",          cls: "st-proc",      color: "--proc" },
+  cas:       { label: "Compra optimista (CAS)",      cls: "st-cas",       color: "--cas" },
+  race:      { label: "Sección crítica SIN protección", cls: "st-race",   color: "--race" },
+  done:      { label: "Terminado",                   cls: "st-done",      color: "--done" },
+};
+const LEGEND = ["run", "csq", "mutexwait", "cvwait", "proc", "cas", "race", "done"];
+
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const $ = (id) => document.getElementById(id);
+const clone = (o) => JSON.parse(JSON.stringify(o));
+
+/* ======================================================================
+   Reconstrucción del estado: una instantánea por evento
+   ====================================================================== */
+function buildModel(trace) {
+  const meta = trace.meta, evs = trace.events.slice(0, 40000);
+  const names = ["D"]; for (let i = 1; i <= meta.workers; i++) names.push("W" + i);
+  const s = {
+    th: Object.fromEntries(names.map((n) => [n, { st: "idle", req: null, extra: "", last: null }])),
+    queue: [], qOwner: null, qWaiters: [], iOwner: null, iWaiters: [],
+    cv: { notFull: [], notEmpty: [] }, inside: [],
+    stock: meta.tickets, sold: 0, confirmed: 0, rejected: 0, casFails: 0, lockWaits: 0,
+    produced: 0, closed: false, raceSeen: false, prodBlocks: 0,
+  };
+  const snaps = [], info = [];
+  const rm = (arr, x) => { const i = arr.indexOf(x); if (i >= 0) arr.splice(i, 1); };
+  const mode = meta.mode;
+
+  for (const e of evs) {
+    const t = s.th[e.th] || (s.th[e.th] = { st: "idle", req: null, extra: "", last: null });
+    const fx = {};  // efectos visuales de este evento
+    switch (e.ev) {
+      case "start": t.st = "run"; break;
+      case "gen": t.req = { id: e.id, user: e.user, qty: e.qty }; t.st = "run"; break;
+      case "lock_wait":
+        t.st = "mutexwait"; s.lockWaits++;
+        (e.obj === "queue" ? s.qWaiters : s.iWaiters).push(e.th); fx.wiggle = e.obj; break;
+      case "lock":
+        if (e.obj === "queue") { rm(s.qWaiters, e.th); s.qOwner = e.th; t.st = "csq"; }
+        else { rm(s.iWaiters, e.th); s.iOwner = e.th; t.st = "csi"; s.inside = [e.th]; }
+        break;
+      case "unlock":
+        if (e.obj === "queue") { if (s.qOwner === e.th) s.qOwner = null; }
+        else { if (s.iOwner === e.th) s.iOwner = null; rm(s.inside, e.th); }
+        t.st = "run"; break;
+      case "cv_wait":
+        if (s.qOwner === e.th) s.qOwner = null;
+        s.cv[e.obj].push(e.th); t.st = "cvwait"; t.extra = e.obj;
+        if (e.obj === "notFull") s.prodBlocks++;
+        break;
+      case "cv_wake":
+        rm(s.cv[e.obj], e.th); s.qOwner = e.th; t.st = "csq"; t.extra = ""; break;
+      case "notify": fx.notify = { cv: e.obj, all: !!e.all }; break;
+      case "push":
+        s.queue.push({ id: e.id, user: e.user, qty: e.qty }); s.produced++;
+        fx.fly = { kind: "push", req: { id: e.id, user: e.user, qty: e.qty }, slot: s.queue.length - 1 };
+        t.req = null; break;
+      case "pop": {
+        const i = s.queue.findIndex((r) => r.id === e.id);
+        const r = i >= 0 ? s.queue.splice(i, 1)[0] : { id: e.id, qty: 0, user: 0 };
+        t.req = r; fx.fly = { kind: "pop", req: r, to: e.th }; break;
+      }
+      case "close": s.closed = true; break;
+      case "proc_start": t.st = "proc"; t.extra = e.ms + " ms"; break;
+      case "proc_end": t.st = "run"; t.extra = ""; break;
+      case "buy": t.st = "run"; break;
+      case "check":
+        if (mode === "mutex") t.st = "csi";
+        else {
+          if (!s.inside.includes(e.th)) s.inside.push(e.th);
+          t.st = mode === "none" ? "race" : "cas";
+          if (mode === "none" && s.inside.length > 1) { s.raceSeen = true; fx.race = true; }
+        }
+        t.extra = `ve ${e.avail}, pide ${e.qty}`; break;
+      case "reject": if (mode !== "mutex") rm(s.inside, e.th); t.extra = ""; break;
+      case "commit":
+        if (mode !== "mutex") rm(s.inside, e.th);
+        s.sold += e.qty;
+        s.stock = e.remaining;  // valor que quedó escrito en el contador
+        fx.flip = true; t.extra = ""; break;
+      case "cas_fail": s.casFails++; fx.shake = true; t.extra = `CAS falló (ahora ${e.seen})`; break;
+      case "result":
+        if (e.ok) s.confirmed++; else s.rejected++;
+        t.req = null; t.last = e.ok ? "ok" : "no"; if (t.st !== "done") t.st = "run";
+        if (mode !== "mutex") rm(s.inside, e.th);
+        break;
+      case "end": t.st = "done"; t.req = null; break;
+    }
+    snaps.push(clone(s));
+    info.push(fx);
+  }
+  return { meta, summary: trace.summary, evs, snaps, info, names };
+}
+
+/* ======================================================================
+   Narración: explica cada evento con conceptos de SO
+   ====================================================================== */
+const who = (n) => (n === "D" ? "El Dispatcher" : n === "main" ? "El hilo principal" : n);
+function narrate(e, s, mode, cap) {
+  const W = who(e.th);
+  switch (e.ev) {
+    case "start": return ["Hilos", `Se crea el hilo <b>${e.th}</b>. Desde ahora el planificador del SO puede ejecutarlo en cualquier núcleo.`, "std::thread t(...);"];
+    case "gen": return ["Productor", `${W} genera la petición <b>#${e.id}</b>: el usuario ${e.user} quiere ${e.qty} entrada(s).`, "Request req{id, userId, tickets};"];
+    case "lock_wait": return ["Exclusión mutua", e.obj === "queue"
+      ? `${W} intenta tomar el mutex de la cola, pero lo tiene <b>${s.qOwner ?? "otro hilo"}</b>. El SO lo bloquea: no consume CPU mientras espera.`
+      : `${W} intenta entrar al inventario, pero el mutex lo tiene <b>${s.iOwner ?? "otro hilo"}</b>. Queda bloqueado en la cola del mutex.`, "mtx.lock();  // bloquea"];
+    case "lock": return ["Exclusión mutua", e.obj === "queue"
+      ? `${W} adquiere el mutex de la cola. Hasta que lo libere, ningún otro hilo puede modificar la cola.`
+      : `${W} adquiere el mutex del inventario y entra a la <b>sección crítica</b>.`, e.obj === "queue" ? "std::unique_lock lock(mtx_);" : "std::lock_guard lock(mtx_);"];
+    case "unlock": return ["Exclusión mutua", `${W} libera el mutex ${e.obj === "queue" ? "de la cola" : "del inventario"}. Si alguien esperaba, el SO lo despierta.`, "// fin del ámbito: RAII libera el mutex"];
+    case "cv_wait": return ["Variable de condición", e.obj === "notFull"
+      ? `La cola está llena (${cap}/${cap}). ${W} llama a <b>wait(notFull)</b>: libera el mutex de forma atómica y se bloquea hasta que un consumidor avise que hay espacio.`
+      : `La cola está vacía. ${W} llama a <b>wait(notEmpty)</b>: libera el mutex y se bloquea sin espera activa hasta que llegue trabajo.`,
+      `${e.obj}_.wait(lock, predicado);`];
+    case "cv_wake": return ["Variable de condición", `${W} despierta de <b>${e.obj}</b>, readquiere el mutex y vuelve a comprobar el predicado (semántica Mesa: protege de despertares espurios).`, "// wait() retorna con el mutex tomado"];
+    case "notify": return ["Variable de condición", e.all
+      ? `<b>notify_all(${e.obj})</b>: se despierta a <b>todos</b> los hilos que esperan, para que vean la bandera de cierre y terminen limpiamente.`
+      : `<b>notify_one(${e.obj})</b>: ${W} avisa a un hilo que ${e.obj === "notEmpty" ? "hay trabajo en la cola" : "se liberó un espacio en la cola"}.`, `${e.obj}_.${e.all ? "notify_all" : "notify_one"}();`];
+    case "push": return ["Productor-consumidor", `${W} inserta la petición <b>#${e.id}</b> al final de la cola (${e.size}/${cap}).`, "queue_.push(req);"];
+    case "pop": return ["Productor-consumidor", `${W} extrae la petición <b>#${e.id}</b> del frente de la cola (FIFO). Quedan ${e.size}.`, "out = queue_.front(); queue_.pop();"];
+    case "close": return ["Terminación", `${W} activa la bandera <b>closed_</b>: no habrá más peticiones. Los Workers vaciarán la cola y luego terminarán.`, "closed_ = true;"];
+    case "proc_start": return ["Planificación", `${W} procesa la petición #${e.id} durante ${e.ms} ms con <b>sleep_for</b>: el hilo pasa a estado bloqueado y la CPU queda libre para otros.`, "std::this_thread::sleep_for(ms);"];
+    case "proc_end": return ["Planificación", `${W} termina de procesar la petición #${e.id} y vuelve a la cola de listos.`, ""];
+    case "buy": return ["Recurso compartido", `${W} intenta comprar ${e.qty} entrada(s) para el usuario ${e.user} (petición #${e.id}).`, "inventory_.purchase(qty);"];
+    case "check":
+      if (mode === "mutex") return ["Sección crítica", `Con el mutex tomado, ${W} verifica: hay <b>${e.avail}</b> y se piden ${e.qty}. Nadie más puede cambiar el stock ahora.`, "if (available_ < qty) ..."];
+      if (mode === "atomic") return ["Lock-free", `${W} lee el stock de forma atómica (<b>${e.avail}</b>) y prepara un compare_exchange. No toma ningún cerrojo.`, "int cur = available.load();"];
+      return s.inside.length > 1
+        ? ["Condición de carrera", `¡Peligro! <b>${s.inside.join(" y ")}</b> verifican el stock al mismo tiempo sin mutex. Ambos pueden ver ${e.avail} y vender las mismas entradas (check-then-act).`, "if (available_ >= qty) /* sin mutex */"]
+        : ["Condición de carrera", `${W} verifica el stock <b>sin protección</b>: ve ${e.avail} y pide ${e.qty}. Si otro hilo entra ahora, habrá carrera.`, "if (available_ >= qty) /* sin mutex */"];
+    case "reject": return ["Recurso compartido", `No alcanza: se piden ${e.qty} y quedan ${e.avail}. La compra se rechaza.`, "return {false, available_};"];
+    case "commit": return [mode === "none" ? "Condición de carrera" : "Sección crítica",
+      `${W} descuenta ${e.qty} entrada(s) y el contador queda en <b>${e.remaining}</b>.` +
+        (mode === "none" && s.sold > M.meta.tickets ? ` <b>¡Ya se vendieron ${s.sold} de ${M.meta.tickets}: sobreventa!</b>` : "") +
+        (mode === "none" && s.sold + e.remaining !== M.meta.tickets ? ` Además vendidas + stock ≠ ${M.meta.tickets}: hubo <b>actualizaciones perdidas</b>.` : ""),
+      mode === "atomic" ? "available.compare_exchange_weak(cur, cur - qty);  // OK" : "available_ -= qty;"];
+    case "cas_fail": return ["Lock-free", `El <b>compare_exchange</b> de ${W} falló: otro hilo cambió el stock (ahora ${e.seen}). En vez de bloquearse, reintenta con el valor nuevo.`, "// CAS falló: cur = valor actual; reintentar"];
+    case "result": return ["Resultado", e.ok ? `Compra <b>confirmada</b> para la petición #${e.id}.` : `Compra <b>rechazada</b> para la petición #${e.id}: entradas agotadas.`, ""];
+    case "end": return ["Terminación", `${W} encontró la cola cerrada y vacía: sale de su bucle y el hilo termina. Luego el hilo principal hará <b>join()</b>.`, "t.join();"];
+  }
+  return ["Evento", `${W}: ${e.ev}`, ""];
+}
+const conceptClass = (c) => c === "Condición de carrera" ? "c-race" : c === "Lock-free" ? "c-cas"
+  : c === "Variable de condición" ? "c-cv" : (c === "Sección crítica" || c === "Exclusión mutua") ? "c-cs" : "";
+
+function shortText(e) {
+  const f = { lock_wait: `espera mutex ${e.obj}`, lock: `lock ${e.obj}`, unlock: `unlock ${e.obj}`,
+    cv_wait: `wait(${e.obj})`, cv_wake: `despierta ${e.obj}`, notify: `${e.all ? "notify_all" : "notify_one"}(${e.obj})`,
+    push: `push #${e.id} (${e.size})`, pop: `pop #${e.id}`, gen: `genera #${e.id} ×${e.qty}`, close: "close()",
+    proc_start: `procesa #${e.id} ${e.ms}ms`, proc_end: `fin proceso #${e.id}`, buy: `compra #${e.id} ×${e.qty}`,
+    check: `check: ve ${e.avail}, pide ${e.qty}`, commit: `commit −${e.qty} → ${e.remaining}`, reject: `rechazo (${e.avail})`,
+    cas_fail: `CAS falló (ve ${e.seen})`, result: `#${e.id} ${e.ok ? "confirmada" : "rechazada"}`, start: "inicio", end: "fin" };
+  return f[e.ev] || e.ev;
+}
+
+/* ======================================================================
+   Vista
+   ====================================================================== */
+let M = null, idx = -1, playing = false, timer = null, current = 0;
+
+const chipHTML = (r) => r ? `<span class="chip q${r.qty}">#${r.id}<span class="tk">u${r.user} · ${r.qty}🎟</span></span>` : "";
+const lockSVG = (held) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="${held ? "M8 11V8a4 4 0 0 1 8 0v3" : "M8 11V8a4 4 0 0 1 7.5-2"}"/></svg>`;
+const mini = (n, cls = "") => `<span class="mini ${cls}" title="${n}">${n}</span>`;
+
+function threadCard(name, t, activeTh) {
+  const st = STATE[t.st] || STATE.run;
+  const title = name === "D" ? "Dispatcher" : "Worker " + name.slice(1);
+  const z = (t.st === "cvwait" || t.st === "mutexwait" || t.st === "proc") ? `<span class="zzz">${t.st === "proc" ? "sleep" : "zzz"}</span>` : "";
+  const extra = t.st === "cvwait" ? `wait(${t.extra})` : t.extra;
+  const last = !t.req && t.last ? `<span class="sub">${t.last === "ok" ? "✔ última: confirmada" : "✖ última: rechazada"}</span>` : "";
+  return `<div class="thread ${st.cls} ${activeTh === name ? "active" : ""}" id="th-${name}">
+    ${z}<div class="top"><div class="avatar">${name}</div><div><div class="name">${title}</div>
+    <div class="state">${st.label}${extra ? " · " + extra : ""}</div></div></div>
+    <div class="req">${chipHTML(t.req)}${last}</div></div>`;
+}
+
+function render(animate) {
+  if (!M) return;
+  const s = idx >= 0 ? M.snaps[idx] : M.snaps0;
+  const e = idx >= 0 ? M.evs[idx] : null;
+  const fx = idx >= 0 ? M.info[idx] : {};
+  const meta = M.meta, cap = meta.capacity, mode = meta.mode;
+
+  // Animación de vuelo: posiciones ANTES de redibujar.
+  let fly = null;
+  if (animate && fx.fly) {
+    if (fx.fly.kind === "push") {
+      const src = document.querySelector("#producer .thread"); const dst = $("slots").children[fx.fly.slot];
+      if (src && dst) fly = { from: src.getBoundingClientRect(), to: () => $("slots").children[fx.fly.slot]?.getBoundingClientRect(), req: fx.fly.req };
+    } else {
+      const src = $("slots").children[0];
+      if (src) fly = { from: src.getBoundingClientRect(), to: () => $("th-" + fx.fly.to)?.getBoundingClientRect(), req: fx.fly.req };
+    }
+  }
+
+  const active = e ? e.th : null;
+  $("producer").innerHTML = threadCard("D", s.th.D, active);
+  const ws = M.names.slice(1);
+  $("workers").className = "workers" + (ws.length > 6 ? " two" : "");
+  $("workers").innerHTML = ws.map((n) => threadCard(n, s.th[n], active)).join("");
+
+  // Cola
+  const slots = [];
+  const shown = Math.min(cap, 12);
+  for (let i = 0; i < shown; i++) {
+    const r = s.queue[i];
+    slots.push(`<div class="slot ${r ? "full" : ""}">${r ? chipHTML(r) : `<span class="idx">${i}</span>`}</div>`);
+  }
+  $("slots").style.gridTemplateColumns = `repeat(${shown}, minmax(0,1fr))`;
+  $("slots").innerHTML = slots.join("");
+  $("qinfo").innerHTML = `${s.queue.length}/${cap} ${s.closed ? '· <span class="closedtag">CERRADA</span>' : ""}`;
+  $("qlock").className = "lock" + (s.qOwner ? " held" : "") + (fx.wiggle === "queue" ? " wiggle" : "");
+  $("qlock").innerHTML = lockSVG(!!s.qOwner) + (s.qOwner ? `mutex: <b>${s.qOwner}</b>` : "mutex libre");
+  $("qwaiters").innerHTML = s.qWaiters.length ? `esperan el mutex: ${s.qWaiters.join(", ")}` : "";
+  for (const cv of ["notFull", "notEmpty"]) {
+    $("who-" + cv).innerHTML = s.cv[cv].map((n) => mini(n)).join("") || `<span class="sub">vacía</span>`;
+    const room = $("room-" + cv);
+    room.classList.remove("pulse");
+    if (fx.notify && fx.notify.cv === cv) {
+      void room.offsetWidth; room.classList.add("pulse");
+      $("tag-" + cv).textContent = fx.notify.all ? "notify_all" : "notify_one";
+    }
+  }
+
+  // Inventario
+  const num = $("stockNum");
+  num.textContent = s.stock; num.classList.toggle("neg", s.stock < 0);
+  if (fx.flip) { num.classList.remove("flip"); void num.offsetWidth; num.classList.add("flip"); }
+  $("stockSub").textContent = `disponibles de ${meta.tickets} · vendidas ${s.sold}`;
+  const bar = $("soldBar"); bar.classList.toggle("over", s.sold > meta.tickets);
+  bar.firstElementChild.style.width = Math.min(100, (s.sold / meta.tickets) * 100) + "%";
+
+  const il = $("ilock");
+  if (mode === "mutex") {
+    il.style.display = ""; il.className = "lock" + (s.iOwner ? " held" : "") + (fx.wiggle === "inventory" ? " wiggle" : "");
+    il.innerHTML = lockSVG(!!s.iOwner) + (s.iOwner ? `dueño: <b>${s.iOwner}</b>` : "libre");
+    $("iwaitLabel").textContent = "Cola del mutex (bloqueados por el SO)";
+    $("iwaiters").innerHTML = s.iWaiters.map((n) => mini(n, "mw")).join("") || `<span class="sub">nadie espera</span>`;
+  } else {
+    il.style.display = "none";
+    $("iwaitLabel").textContent = mode === "atomic" ? "Sin mutex: los hilos nunca se bloquean, reintentan" : "Sin mutex: nada impide que entren varios hilos";
+    $("iwaiters").innerHTML = mode === "atomic" ? `<span class="sub">CAS fallidos hasta ahora: <b>${s.casFails}</b></span>` : `<span class="sub">⚠ protección desactivada (--no-sync)</span>`;
+  }
+  const inside = mode === "mutex" ? (s.iOwner ? [s.iOwner] : []) : s.inside;
+  const cz = $("cszone");
+  cz.className = "cszone" + (inside.length ? " busy" : "") + (mode === "none" && inside.length > 1 ? " race" : "");
+  if (fx.shake) { void cz.offsetWidth; cz.classList.add("shake"); }
+  $("csTitle").textContent = mode === "atomic" ? "Zona optimista: leer → CAS" : "Sección crítica: verificar → descontar";
+  $("csLabel").innerHTML = !inside.length ? "Nadie dentro"
+    : mode === "none" && inside.length > 1 ? `<b style="color:var(--race)">¡${inside.length} hilos dentro a la vez!</b>`
+    : `${inside.length} hilo${inside.length > 1 ? "s" : ""} dentro`;
+  $("csWho").innerHTML = inside.map((n) => mini(n, mode === "none" ? "race" : mode === "atomic" ? "cas" : "cs")).join("");
+
+  const over = s.sold > meta.tickets;
+  $("stats").innerHTML = [
+    ["Confirmadas", s.confirmed], ["Rechazadas", s.rejected],
+    ["Generadas", s.produced + "/" + meta.requests], ["Esperas por mutex", s.lockWaits],
+    [mode === "atomic" ? "CAS fallidos" : "Bloqueos productor", mode === "atomic" ? s.casFails : s.prodBlocks],
+    ["Sobreventa", over ? "+" + (s.sold - meta.tickets) : "0", over],
+  ].map(([k, v, bad]) => `<div class="stat ${bad ? "bad" : ""}"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+
+  // Narración
+  if (e) {
+    const prev = idx > 0 ? M.snaps[idx - 1] : M.snaps0;
+    const [c, txt, code] = narrate(e, e.ev === "lock_wait" ? prev : s, mode, cap);
+    $("concept").textContent = c; $("concept").className = "concept " + conceptClass(c);
+    $("narr").innerHTML = txt; $("code").textContent = code || "";
+  } else {
+    $("concept").textContent = "Inicio"; $("concept").className = "concept";
+    $("narr").innerHTML = `Escenario: <b>${M.scenarioTitle}</b>. ${M.scenarioDesc} Presiona <b>Reproducir</b> o la barra espaciadora.`;
+    $("code").textContent = "./ticketstorm " + cmdLine(meta);
+  }
+
+  // Veredicto final
+  const v = $("verdict");
+  if (idx === M.evs.length - 1 && M.summary) {
+    const ok = M.summary.exitCode === 0;
+    v.className = "verdict show " + (ok ? "ok" : "bad");
+    v.innerHTML = ok ? `✔ Verificación OK<small>Vendidas ${M.summary.sold} + restantes ${M.summary.remaining} = stock inicial ${M.summary.total}. Tiempo real: ${M.summary.elapsedMs} ms.</small>`
+      : `✖ Condición de carrera detectada<small>Se vendieron ${M.summary.sold} entradas habiendo solo ${M.summary.total}. El contador terminó en ${M.summary.remaining}.</small>`;
+  } else v.className = "verdict";
+
+  updateLog(); updateTransport(); drawGantt();
+  if (fly) flyChip(fly);
+}
+
+function flyChip(f) {
+  const to = f.to(); if (!to) return;
+  const g = document.createElement("div");
+  g.className = "ghost"; g.innerHTML = chipHTML(f.req);
+  document.body.appendChild(g);
+  const sx = f.from.left + f.from.width / 2, sy = f.from.top + f.from.height / 2;
+  const tx = to.left + to.width / 2, ty = to.top + to.height / 2;
+  const w = g.offsetWidth, h = g.offsetHeight;
+  g.style.left = sx - w / 2 + "px"; g.style.top = sy - h / 2 + "px";
+  const dur = Math.max(160, Math.min(650, stepMs() * 0.8));
+  g.animate([{ transform: "translate(0,0) scale(1.1)" }, { transform: `translate(${tx - sx}px, ${ty - sy}px) scale(1)` }],
+    { duration: dur, easing: "cubic-bezier(.2,.8,.2,1)" }).onfinish = () => g.remove();
+}
+
+function cmdLine(m) {
+  const mode = m.mode === "none" ? " --no-sync" : m.mode === "atomic" ? " --atomic" : "";
+  return `-w ${m.workers} -q ${m.capacity} -t ${m.tickets} -r ${m.requests} --min-ms ${m.minMs} --max-ms ${m.maxMs} --window-us ${m.windowUs} --seed ${m.seed}${mode}`;
+}
+
+/* registro */
+let logBuilt = false;
+function buildLog() {
+  $("log").innerHTML = M.evs.map((e, i) =>
+    `<div class="row future" data-i="${i}"><span class="t">${(e.t / 1000).toFixed(2)}</span><span class="th">${e.th}</span><span>${shortText(e)}</span></div>`).join("");
+  logBuilt = true;
+}
+let lastLogIdx = -1;
+function updateLog() {
+  if (!logBuilt) buildLog();
+  const rows = $("log").children;
+  const lo = Math.min(lastLogIdx, idx), hi = Math.max(lastLogIdx, idx);
+  if (lastLogIdx === -2) { for (let i = 0; i < rows.length; i++) rows[i].className = "row" + (i > idx ? " future" : i === idx ? " cur" : ""); }
+  else for (let i = Math.max(0, lo); i <= Math.min(rows.length - 1, hi); i++) rows[i].className = "row" + (i > idx ? " future" : i === idx ? " cur" : "");
+  if (idx >= 0 && rows[idx]) rows[idx].scrollIntoView({ block: "nearest" });
+  lastLogIdx = idx;
+}
+
+/* transporte */
+const stepMs = () => 750 / parseFloat($("speed").value);
+function updateTransport() {
+  if (!M) return;
+  $("scrub").max = M.evs.length; $("scrub").value = idx + 1;
+  const t = idx >= 0 ? M.evs[idx].t / 1000 : 0;
+  $("pos").textContent = `evento ${idx + 1}/${M.evs.length} · t = ${t.toFixed(3)} ms`;
+  $("playIcon").innerHTML = playing ? '<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>' : '<path d="M7 5v14l12-7z"/>';
+}
+function seek(i, animate = false) { idx = Math.max(-1, Math.min(M.evs.length - 1, i)); render(animate); }
+function step() {
+  if (idx >= M.evs.length - 1) { pause(); return; }
+  let next = idx + 1;
+  if ($("skipQ").checked) {
+    while (next < M.evs.length - 1 && (M.evs[next].obj === "queue" && (M.evs[next].ev === "lock" || M.evs[next].ev === "unlock"))) next++;
+  }
+  seek(next, true);
+}
+function play() { if (idx >= M.evs.length - 1) seek(-1); playing = true; tick(); updateTransport(); }
+function tick() { clearTimeout(timer); if (!playing) return; step(); if (playing) timer = setTimeout(tick, stepMs()); }
+function pause() { playing = false; clearTimeout(timer); updateTransport(); }
+function toggle() { playing ? pause() : play(); }
+
+/* Gantt */
+let ganttCache = null;
+function drawGantt() {
+  const cv = $("gantt"), box = $("ganttBox");
+  const dpr = window.devicePixelRatio || 1;
+  const W = box.clientWidth, H = box.clientHeight;
+  if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; ganttCache = null; }
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const names = M.names, n = M.evs.length, padL = 34;
+  const rowH = Math.min(18, (H - 6) / names.length);
+  if (!ganttCache) {
+    const off = document.createElement("canvas"); off.width = W * dpr; off.height = H * dpr;
+    const o = off.getContext("2d"); o.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const cw = (W - padL) / n;
+    o.font = "11px " + css("--mono"); o.textBaseline = "middle";
+    names.forEach((name, r) => {
+      const y = 3 + r * rowH;
+      o.fillStyle = css("--ink2"); o.fillText(name, 2, y + rowH / 2);
+      let start = 0, cur = M.snaps[0].th[name]?.st;
+      for (let i = 1; i <= n; i++) {
+        const st = i < n ? M.snaps[i].th[name]?.st : null;
+        if (st !== cur || i === n) {
+          o.fillStyle = css((STATE[cur] || STATE.idle).color);
+          o.fillRect(padL + start * cw, y + 2, Math.max(1, (i - start) * cw), rowH - 4);
+          start = i; cur = st;
+        }
+      }
+    });
+    ganttCache = off;
+  }
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(ganttCache, 0, 0, W, H);
+  if (idx >= 0) {
+    const x = padL + (idx + 0.5) * ((W - padL) / n);
+    ctx.fillStyle = css("--ink"); ctx.fillRect(x - 1, 0, 2, H);
+  }
+}
+
+/* ======================================================================
+   Carga de escenarios
+   ====================================================================== */
+function load(trace, title, desc) {
+  pause();
+  M = buildModel(trace);
+  M.snaps0 = { th: Object.fromEntries(M.names.map((n) => [n, { st: "idle", req: null, extra: "", last: null }])),
+    queue: [], qOwner: null, qWaiters: [], iOwner: null, iWaiters: [], cv: { notFull: [], notEmpty: [] }, inside: [],
+    stock: trace.meta.tickets, sold: 0, confirmed: 0, rejected: 0, casFails: 0, lockWaits: 0, produced: 0, closed: false, prodBlocks: 0 };
+  M.scenarioTitle = title; M.scenarioDesc = desc;
+  const m = trace.meta;
+  $("modebar").innerHTML = `<span class="modebadge ${m.mode}">${MODE_LABEL[m.mode] || m.mode}</span>
+    <span class="param">Workers <b>${m.workers}</b></span><span class="param">Cola <b>${m.capacity}</b></span>
+    <span class="param">Entradas <b>${m.tickets}</b></span><span class="param">Peticiones <b>${m.requests}</b></span>
+    <span class="param">Proceso <b>${m.minMs}–${m.maxMs} ms</b></span><span class="param">Ventana pago <b>${m.windowUs} µs</b></span>
+    <span class="param">Semilla <b>${m.seed}</b></span><span class="param">Eventos reales <b>${M.evs.length}</b></span>
+    <span class="scenario-desc">${desc}</span>`;
+  logBuilt = false; lastLogIdx = -2; ganttCache = null;
+  seek(-1);
+}
+
+function renderTabs(activeKey) {
+  $("tabs").innerHTML = SCENARIOS.map((s, i) =>
+    `<button class="tab ${s.key === activeKey ? "active" : ""}" data-k="${s.key}"><kbd>${i + 1}</kbd>${s.title}</button>`).join("");
+}
+function loadScenario(key) {
+  const T = window.TS_TRACES || {};
+  const sc = SCENARIOS.find((s) => s.key === key);
+  if (!T[key]) { $("narr").innerHTML = "No se encontró <code>traces.js</code>. Genera las trazas con <code>make gui</code> o abre un archivo JSON."; return; }
+  renderTabs(key); load(T[key], sc.title, sc.desc);
+}
+function loadFile(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const tr = JSON.parse(r.result);
+      if (!tr.meta || !Array.isArray(tr.events)) throw new Error("formato");
+      renderTabs(null); load(tr, file.name, "Traza cargada desde archivo.");
+    } catch { alert("El archivo no es una traza válida de TicketStorm (--trace)."); }
+  };
+  r.readAsText(file);
+}
+
+/* ======================================================================
+   Eventos de interfaz
+   ====================================================================== */
+$("legend").innerHTML = LEGEND.map((k) => `<span><i style="background:var(${STATE[k].color})"></i>${STATE[k].label}</span>`).join("");
+$("tabs").addEventListener("click", (ev) => { const b = ev.target.closest(".tab"); if (b) loadScenario(b.dataset.k); });
+$("bPlay").onclick = toggle;
+$("bNext").onclick = () => { pause(); step(); };
+$("bPrev").onclick = () => { pause(); seek(idx - 1); };
+$("bStart").onclick = () => { pause(); seek(-1); };
+$("bEnd").onclick = () => { pause(); seek(M.evs.length - 1); };
+$("scrub").oninput = (ev) => { pause(); seek(parseInt(ev.target.value, 10) - 1); };
+$("log").onclick = (ev) => { const r = ev.target.closest(".row"); if (r) { pause(); seek(parseInt(r.dataset.i, 10)); } };
+$("gantt").onclick = (ev) => {
+  const rect = ev.target.getBoundingClientRect(); const x = ev.clientX - rect.left - 34;
+  if (x >= 0) { pause(); seek(Math.floor(x / ((rect.width - 34) / M.evs.length))); }
+};
+$("openBtn").onclick = () => $("fileIn").click();
+$("fileIn").onchange = (ev) => ev.target.files[0] && loadFile(ev.target.files[0]);
+function setTheme(t) {
+  document.documentElement.dataset.theme = t; ganttCache = null; if (M) drawGantt();
+  try { localStorage.setItem("ts-theme", t); } catch {}
+}
+$("themeBtn").onclick = () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
+$("helpBtn").onclick = () => $("help").classList.toggle("show");
+$("help").onclick = (ev) => { if (ev.target.id === "help") $("help").classList.remove("show"); };
+window.addEventListener("resize", () => { ganttCache = null; if (M) drawGantt(); });
+let dragDepth = 0;
+window.addEventListener("dragenter", (ev) => { ev.preventDefault(); dragDepth++; $("drop").classList.add("show"); });
+window.addEventListener("dragleave", () => { if (--dragDepth <= 0) $("drop").classList.remove("show"); });
+window.addEventListener("dragover", (ev) => ev.preventDefault());
+window.addEventListener("drop", (ev) => { ev.preventDefault(); dragDepth = 0; $("drop").classList.remove("show"); const f = ev.dataTransfer.files[0]; if (f) loadFile(f); });
+const speeds = ["0.25", "0.5", "1", "2", "4", "8", "16"];
+window.addEventListener("keydown", (ev) => {
+  if (ev.target.tagName === "SELECT" || ev.target.tagName === "INPUT" && ev.target.type !== "range") return;
+  const k = ev.key;
+  if (k === " ") { ev.preventDefault(); toggle(); }
+  else if (k === "ArrowRight") { ev.preventDefault(); pause(); step(); }
+  else if (k === "ArrowLeft") { ev.preventDefault(); pause(); seek(idx - 1); }
+  else if (k === "Home") { pause(); seek(-1); }
+  else if (k === "End") { pause(); seek(M.evs.length - 1); }
+  else if (k === "+" || k === "=" || k === "-") {
+    const i = speeds.indexOf($("speed").value); const j = Math.max(0, Math.min(speeds.length - 1, i + (k === "-" ? -1 : 1)));
+    $("speed").value = speeds[j];
+  }
+  else if (k >= "1" && k <= "4") loadScenario(SCENARIOS[+k - 1].key);
+  else if (k === "f" || k === "F") { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); }
+  else if (k === "t" || k === "T") $("themeBtn").click();
+  else if (k === "?") $("help").classList.toggle("show");
+  else if (k === "Escape") $("help").classList.remove("show");
+});
+
+(function init() {
+  let t = null; try { t = localStorage.getItem("ts-theme"); } catch {}
+  setTheme(t || "dark");
+  loadScenario("basico");
+})();
+</script>
+</body>
+</html>
