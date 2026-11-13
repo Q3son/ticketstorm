@@ -329,6 +329,7 @@ select { background: var(--panel); border: 1px solid var(--line); border-radius:
       <tr><td><kbd>F</kbd></td><td>Pantalla completa</td></tr>
       <tr><td><kbd>T</kbd></td><td>Tema claro / oscuro</td></tr>
       <tr><td><kbd>?</kbd> / <kbd>Esc</kbd></td><td>Mostrar / ocultar esta ayuda</td></tr>
+      <tr><td><code>#nosync@83</code></td><td>Enlace directo a un escenario y evento</td></tr>
     </table>
     <p class="sub">Haz clic en la línea de tiempo o en el registro para saltar a un evento. También puedes arrastrar un archivo generado con <code>./ticketstorm --trace archivo.json</code>.</p>
   </div>
@@ -519,7 +520,7 @@ function shortText(e) {
    ====================================================================== */
 let M = null, idx = -1, playing = false, timer = null, current = 0;
 
-const chipHTML = (r) => r ? `<span class="chip q${r.qty}">#${r.id}<span class="tk">u${r.user} · ${r.qty}🎟</span></span>` : "";
+const chipHTML = (r) => r ? `<span class="chip q${r.qty}">#${r.id}<span class="tk">u${r.user} · ${r.qty} ent.</span></span>` : "";
 const lockSVG = (held) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="${held ? "M8 11V8a4 4 0 0 1 8 0v3" : "M8 11V8a4 4 0 0 1 7.5-2"}"/></svg>`;
 const mini = (n, cls = "") => `<span class="mini ${cls}" title="${n}">${n}</span>`;
 
@@ -839,8 +840,12 @@ window.addEventListener("keydown", (ev) => {
 
 (function init() {
   let t = null; try { t = localStorage.getItem("ts-theme"); } catch {}
-  setTheme(t || "dark");
-  loadScenario("basico");
+  const qTheme = new URLSearchParams(location.search).get("theme");  // ?theme=light|dark
+  setTheme(qTheme || t || "dark");
+  // Enlace directo: index.html#escenario o index.html#escenario@evento (p. ej. #nosync@83).
+  const [key, at] = decodeURIComponent(location.hash.slice(1)).split("@");
+  loadScenario(SCENARIOS.some((s) => s.key === key) ? key : "basico");
+  if (at !== undefined && !isNaN(+at)) seek(+at);
 })();
 </script>
 </body>
