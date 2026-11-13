@@ -25,6 +25,7 @@ struct Config {
     bool        timestamps    = false; // true => trazas con marca de tiempo (ms)
     bool        showHelp      = false;
     unsigned    seed          = 0;     // 0 => semilla aleatoria
+    std::string traceFile;             // si no está vacío, escribe la traza JSON
 };
 
 // Interpreta los argumentos de línea de comandos.

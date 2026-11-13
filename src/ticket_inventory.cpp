@@ -3,6 +3,8 @@
 #include <chrono>
 #include <thread>
 
+#include "tracer.hpp"
+
 const char* toString(SyncMode mode) {
     switch (mode) {
         case SyncMode::Mutex:  return "mutex";
@@ -34,8 +36,16 @@ TicketInventory::Purchase TicketInventory::purchase(int quantity) {
     }
     switch (mode_) {
         case SyncMode::Mutex: {
-            std::lock_guard<std::mutex> lock(mtx_);  // entrada a la sección crítica
-            return purchaseUnlocked(quantity);       // salida automática (RAII)
+            // Entrada a la sección crítica (se registra si hubo que esperar).
+            std::unique_lock<std::mutex> lock(mtx_, std::try_to_lock);
+            if (!lock.owns_lock()) {
+                trace::emit("lock_wait", "inventory");
+                lock.lock();
+            }
+            trace::emit("lock", "inventory");
+            const Purchase result = purchaseUnlocked(quantity);
+            trace::emit("unlock", "inventory");
+            return result;  // salida automática (RAII)
         }
         case SyncMode::Atomic:
             return purchaseAtomic(quantity);
@@ -56,21 +66,28 @@ void TicketInventory::paymentWindow() const {
 
 TicketInventory::Purchase TicketInventory::purchaseUnlocked(int quantity) {
     // 1) Verificar disponibilidad.
-    if (available_ < quantity) {
-        return Purchase{false, available_};
+    const int seen = available_;
+    trace::emit("check", "inventory", {{"avail", seen}, {"qty", quantity}});
+    if (seen < quantity) {
+        trace::emit("reject", "inventory", {{"avail", seen}, {"qty", quantity}});
+        return Purchase{false, seen};
     }
     // 2) Validación de pago.
     paymentWindow();
     // 3) Descontar.
     available_ -= quantity;
-    return Purchase{true, available_};
+    const int after = available_;
+    trace::emit("commit", "inventory", {{"qty", quantity}, {"remaining", after}});
+    return Purchase{true, after};
 }
 
 TicketInventory::Purchase TicketInventory::purchaseAtomic(int quantity) {
     int current = atomicAvailable_.load(std::memory_order_acquire);
     while (true) {
         // 1) Verificar sobre la copia leída.
+        trace::emit("check", "inventory", {{"avail", current}, {"qty", quantity}});
         if (current < quantity) {
+            trace::emit("reject", "inventory", {{"avail", current}, {"qty", quantity}});
             return Purchase{false, current};
         }
         // 2) Validación de pago (sin cerrojo: otros hilos siguen avanzando).
@@ -80,8 +97,11 @@ TicketInventory::Purchase TicketInventory::purchaseAtomic(int quantity) {
         if (atomicAvailable_.compare_exchange_weak(current, current - quantity,
                                                    std::memory_order_acq_rel,
                                                    std::memory_order_acquire)) {
+            trace::emit("commit", "inventory", {{"qty", quantity}, {"remaining", current - quantity}});
             return Purchase{true, current - quantity};
         }
+        // Otro hilo modificó el stock: el CAS falló y `current` ya trae el valor nuevo.
+        trace::emit("cas_fail", "inventory", {{"seen", current}});
     }
 }
 

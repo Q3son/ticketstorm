@@ -64,7 +64,8 @@ bool parseArgs(int argc, char** argv, Config& cfg, std::string& error) {
                                arg == "--queue" || arg == "-t" || arg == "--tickets" ||
                                arg == "-r" || arg == "--requests" || arg == "--min-ms" ||
                                arg == "--max-ms" || arg == "--window-us" ||
-                               arg == "--seed" || arg == "--sync-mode";
+                               arg == "--seed" || arg == "--sync-mode" ||
+                               arg == "--trace";
         if (!withValue) {
             error = "Opción desconocida: " + arg;
             return false;
@@ -77,7 +78,13 @@ bool parseArgs(int argc, char** argv, Config& cfg, std::string& error) {
         const std::string value = argv[++i];
         long long n = 0;
 
-        if (arg == "--sync-mode") {
+        if (arg == "--trace") {
+            if (value.empty()) {
+                error = "La opción --trace necesita un nombre de archivo.";
+                return false;
+            }
+            cfg.traceFile = value;
+        } else if (arg == "--sync-mode") {
             SyncMode mode;
             if (value == "mutex") {
                 mode = SyncMode::Mutex;
@@ -146,6 +153,7 @@ void printUsage(const char* program) {
         << "      --no-sync       Atajo de --sync-mode none (condición de carrera)\n"
         << "      --quiet         Solo imprime cabecera y resumen final\n"
         << "      --timestamps    Antepone a cada traza el tiempo transcurrido (ms)\n"
+        << "      --trace ARCHIVO Guarda los eventos de sincronización en JSON (gui/)\n"
         << "      --seed N        Semilla de las peticiones (0 = aleatoria) [0]\n"
         << "  -h, --help          Muestra esta ayuda\n\n"
         << "Código de salida: 0 = OK, 1 = condición de carrera detectada, "
