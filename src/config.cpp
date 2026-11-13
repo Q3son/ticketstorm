@@ -32,6 +32,7 @@ bool parseInt(const std::string& option, const std::string& text, long long lo,
 }  // namespace
 
 bool parseArgs(int argc, char** argv, Config& cfg, std::string& error) {
+    bool modeGiven = false;  // detecta modos de sincronización contradictorios
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
 
@@ -39,8 +40,14 @@ bool parseArgs(int argc, char** argv, Config& cfg, std::string& error) {
             cfg.showHelp = true;
             return true;
         }
-        if (arg == "--no-sync") {
-            cfg.synchronized = false;
+        if (arg == "--no-sync" || arg == "--atomic") {
+            const SyncMode mode = arg == "--atomic" ? SyncMode::Atomic : SyncMode::None;
+            if (modeGiven && cfg.syncMode != mode) {
+                error = "Las opciones --no-sync, --atomic y --sync-mode son excluyentes.";
+                return false;
+            }
+            cfg.syncMode = mode;
+            modeGiven = true;
             continue;
         }
         if (arg == "--quiet") {
@@ -53,7 +60,7 @@ bool parseArgs(int argc, char** argv, Config& cfg, std::string& error) {
                                arg == "--queue" || arg == "-t" || arg == "--tickets" ||
                                arg == "-r" || arg == "--requests" || arg == "--min-ms" ||
                                arg == "--max-ms" || arg == "--window-us" ||
-                               arg == "--seed";
+                               arg == "--seed" || arg == "--sync-mode";
         if (!withValue) {
             error = "Opción desconocida: " + arg;
             return false;
@@ -66,7 +73,26 @@ bool parseArgs(int argc, char** argv, Config& cfg, std::string& error) {
         const std::string value = argv[++i];
         long long n = 0;
 
-        if (arg == "-w" || arg == "--workers") {
+        if (arg == "--sync-mode") {
+            SyncMode mode;
+            if (value == "mutex") {
+                mode = SyncMode::Mutex;
+            } else if (value == "atomic") {
+                mode = SyncMode::Atomic;
+            } else if (value == "none") {
+                mode = SyncMode::None;
+            } else {
+                error = "Valor inválido para --sync-mode: '" + value +
+                        "' (use mutex, atomic o none).";
+                return false;
+            }
+            if (modeGiven && cfg.syncMode != mode) {
+                error = "Las opciones --no-sync, --atomic y --sync-mode son excluyentes.";
+                return false;
+            }
+            cfg.syncMode = mode;
+            modeGiven = true;
+        } else if (arg == "-w" || arg == "--workers") {
             if (!parseInt(arg, value, 1, kMaxWorkers, n, error)) return false;
             cfg.numWorkers = static_cast<int>(n);
         } else if (arg == "-q" || arg == "--queue") {
@@ -111,7 +137,9 @@ void printUsage(const char* program) {
         << "      --min-ms N      Procesamiento mínimo por petición (ms) [50]\n"
         << "      --max-ms N      Procesamiento máximo por petición (ms) [150]\n"
         << "      --window-us N   Ventana verificar->descontar (us)      [200]\n"
-        << "      --no-sync       Versión SIN mutex en el contador (condición de carrera)\n"
+        << "      --sync-mode M   Sincronización del contador: mutex | atomic | none [mutex]\n"
+        << "      --atomic        Atajo de --sync-mode atomic (compare_exchange, sin cerrojo)\n"
+        << "      --no-sync       Atajo de --sync-mode none (condición de carrera)\n"
         << "      --quiet         Solo imprime cabecera y resumen final\n"
         << "      --seed N        Semilla de las peticiones (0 = aleatoria) [0]\n"
         << "  -h, --help          Muestra esta ayuda\n\n"
