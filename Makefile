@@ -17,10 +17,11 @@ endif
 BIN     := ticketstorm$(EXE)
 BIN_TSAN := ticketstorm_tsan$(EXE)
 UNIT_BIN := unit_tests$(EXE)
+BENCH_BIN := bench_inventory$(EXE)
 TEST_SRCS := $(wildcard tests/*.cpp)
 LIB_OBJS := $(filter-out $(OBJ_DIR)/main.o,$(OBJS))
 
-.PHONY: all tsan unit test run clean
+.PHONY: all tsan unit bench test run clean
 
 all: $(BIN)
 
@@ -46,6 +47,13 @@ $(UNIT_BIN): $(LIB_OBJS) $(TEST_SRCS)
 unit: $(UNIT_BIN)
 	./$(UNIT_BIN)
 
+# Micro-benchmark del inventario: mutex vs. atómico.
+$(BENCH_BIN): $(LIB_OBJS) bench/bench_inventory.cpp
+	$(CXX) $(CXXFLAGS) -Iinclude bench/bench_inventory.cpp $(LIB_OBJS) $(LDFLAGS) -o $@
+
+bench: $(BENCH_BIN)
+	./$(BENCH_BIN)
+
 # Plan de pruebas automatizado (Tabla 4 del documento) + pruebas unitarias.
 test: $(BIN) unit
 	bash scripts/run_tests.sh ./$(BIN)
@@ -54,6 +62,6 @@ run: $(BIN)
 	./$(BIN)
 
 clean:
-	rm -rf $(OBJ_DIR) $(BIN) $(BIN_TSAN) $(UNIT_BIN)
+	rm -rf $(OBJ_DIR) $(BIN) $(BIN_TSAN) $(UNIT_BIN) $(BENCH_BIN)
 
 -include $(DEPS)
