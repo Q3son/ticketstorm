@@ -12,6 +12,7 @@
 #include "logger.hpp"
 #include "request_queue.hpp"
 #include "ticket_inventory.hpp"
+#include "tracer.hpp"
 #include "worker.hpp"
 
 int Simulation::run() {
@@ -43,6 +44,11 @@ int Simulation::run() {
             baseSeed + 1000u + static_cast<unsigned>(i)));
     }
     Dispatcher dispatcher(queue, logger, config_, baseSeed);
+
+    if (!config_.traceFile.empty()) {
+        trace::enable();
+        trace::setThread("main");
+    }
 
     const auto start = std::chrono::steady_clock::now();
 
@@ -108,6 +114,25 @@ int Simulation::run() {
               "vendidas nunca superan las disponibles).";
     }
     logger.always(os.str());
+
+    if (!config_.traceFile.empty()) {
+        std::ostringstream meta, summary;
+        meta << "{\"workers\":" << config_.numWorkers << ",\"capacity\":" << config_.queueCapacity
+             << ",\"tickets\":" << total << ",\"requests\":" << config_.totalRequests
+             << ",\"mode\":\"" << toString(config_.syncMode) << "\",\"seed\":" << baseSeed
+             << ",\"minMs\":" << config_.minProcessMs << ",\"maxMs\":" << config_.maxProcessMs
+             << ",\"windowUs\":" << config_.raceWindowUs << '}';
+        summary << "{\"generated\":" << dispatcher.produced() << ",\"attended\":" << attended
+                << ",\"sold\":" << sold << ",\"rejected\":" << rejected
+                << ",\"remaining\":" << remaining << ",\"total\":" << total
+                << ",\"elapsedMs\":" << elapsedMs << ",\"exitCode\":" << exitCode << '}';
+        if (trace::writeJson(config_.traceFile, meta.str(), summary.str())) {
+            logger.always("Traza: " + std::to_string(trace::size()) + " eventos guardados en " +
+                          config_.traceFile);
+        } else {
+            logger.always("Error: no se pudo escribir la traza en " + config_.traceFile);
+        }
+    }
 
     return exitCode;
 }

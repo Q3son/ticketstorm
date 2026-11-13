@@ -4,6 +4,8 @@
 #include <random>
 #include <string>
 
+#include "tracer.hpp"
+
 namespace {
 const char* const kTag = "Dispatcher";
 }
@@ -20,12 +22,15 @@ void Dispatcher::run() {
     std::uniform_int_distribution<int> ticketDist(kMinTicketsPerRequest,
                                                   kMaxTicketsPerRequest);
     const std::size_t capacity = queue_.capacity();
+    trace::setThread("D");
+    trace::emit("start");
 
     for (int i = 1; i <= config_.totalRequests; ++i) {
         Request req;
         req.id      = i;
         req.userId  = userDist(rng);
         req.tickets = ticketDist(rng);
+        trace::emit("gen", "", {{"id", req.id}, {"user", req.userId}, {"qty", req.tickets}});
 
         const RequestQueue::PushResult res = queue_.push(
             req,
@@ -53,4 +58,5 @@ void Dispatcher::run() {
     logger_.log(kTag, "Todas las peticiones fueron generadas. Activando bandera de "
                       "finalizado y despertando a los Workers.");
     queue_.close();  // bandera "finalizado" + notify_all
+    trace::emit("end");
 }

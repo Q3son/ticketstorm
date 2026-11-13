@@ -4,6 +4,8 @@
 #include <random>
 #include <thread>
 
+#include "tracer.hpp"
+
 Worker::Worker(int id,
                RequestQueue& queue,
                TicketInventory& inventory,
@@ -23,6 +25,8 @@ void Worker::run() {
     std::uniform_int_distribution<int> processDist(config_.minProcessMs,
                                                    config_.maxProcessMs);
     Request req;
+    trace::setThread("W" + std::to_string(id_));
+    trace::emit("start");
 
     while (true) {
         const RequestQueue::PopResult res = queue_.pop(req, [this] {
@@ -39,10 +43,16 @@ void Worker::run() {
         ++stats_.attended;
         logger_.log(tag_, "Atendiendo petición #" + std::to_string(req.id) + "...");
 
-        // Simula el tiempo de procesamiento.
-        std::this_thread::sleep_for(std::chrono::milliseconds(processDist(rng)));
+        // Simula el tiempo de procesamiento (el hilo duerme: no usa CPU).
+        const int processMs = processDist(rng);
+        trace::emit("proc_start", "", {{"id", req.id}, {"ms", processMs}});
+        std::this_thread::sleep_for(std::chrono::milliseconds(processMs));
+        trace::emit("proc_end", "", {{"id", req.id}});
 
+        trace::emit("buy", "", {{"id", req.id}, {"qty", req.tickets}, {"user", req.userId}});
         const TicketInventory::Purchase purchase = inventory_.purchase(req.tickets);
+        trace::emit("result", "", {{"id", req.id}, {"ok", purchase.confirmed ? 1 : 0},
+                                   {"qty", req.tickets}, {"remaining", purchase.remaining}});
 
         if (purchase.confirmed) {
             ++stats_.confirmed;
@@ -63,4 +73,5 @@ void Worker::run() {
     }
 
     logger_.log(tag_, "Cola cerrada y vacía. Terminando.");
+    trace::emit("end");
 }
