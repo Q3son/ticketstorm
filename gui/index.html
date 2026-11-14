@@ -286,6 +286,29 @@ b { font-weight: 700; }
 .choice span { font-size: 13.5px; opacity: .8; }
 .keys { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 18px; font-size: 12.5px; color: var(--ink3); }
 .keys kbd { font: 600 11px/1 var(--mono); border: 1px solid var(--line2); border-radius: 5px; padding: 3px 6px; color: var(--ink2); margin-right: 4px; }
+/* historia y conclusiones */
+.story .facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 4px 0 18px; }
+.fact { border: 1px solid var(--line2); border-radius: 16px; padding: 12px 14px; background: var(--panel2); }
+.fact b { display: block; font: 800 34px/1 var(--display); letter-spacing: -1px; }
+.fact span { font-size: 12.5px; color: var(--ink2); }
+.fact.alert { border-color: var(--race); background: color-mix(in srgb, var(--race) 10%, transparent); }
+.fact.alert b { color: var(--race); }
+.story .ask { font: 700 22px/1.25 var(--display); margin: 0 0 16px; color: var(--ink); }
+.concl { width: min(1080px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; }
+.concl h2 { font-size: 40px; }
+.cmp { width: 100%; border-collapse: separate; border-spacing: 0 6px; margin: 6px 0 16px; font-size: 14px; }
+.cmp th { text-align: left; font: 600 10.5px/1 var(--mono); letter-spacing: 1.5px; text-transform: uppercase; color: var(--ink3); padding: 0 12px 4px; }
+.cmp td { background: var(--panel2); padding: 10px 12px; vertical-align: top; color: var(--ink2); }
+.cmp td:first-child { border-radius: 12px 0 0 12px; color: var(--ink); font-weight: 700; }
+.cmp td:last-child { border-radius: 0 12px 12px 0; }
+.cmp td.ours { color: var(--ink); }
+.cmp .tag { display: inline-block; font: 600 10px/1 var(--mono); padding: 3px 6px; border-radius: 5px; margin-bottom: 4px; background: color-mix(in srgb, var(--amber) 18%, transparent); color: var(--amber); }
+.cl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; counter-reset: c; }
+.cl div { counter-increment: c; border: 1px solid var(--line2); border-radius: 14px; padding: 12px 14px 12px 50px; position: relative; font-size: 14.5px; line-height: 1.4; color: var(--ink2); }
+.cl div b { color: var(--ink); }
+.cl div::before { content: counter(c); position: absolute; left: 14px; top: 12px; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; font: 800 13px/1 var(--display); background: var(--amber); color: var(--amber-ink); }
+.cl div.wide { grid-column: 1 / -1; border-color: var(--amber); }
+.note { font-size: 12px; color: var(--ink3); margin-top: 12px; }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 420px; z-index: 75; background: var(--panel-solid); border-left: 1px solid var(--line2); transform: translateX(100%); transition: transform .35s cubic-bezier(.2,.8,.2,1); display: grid; grid-template-rows: auto minmax(0,1fr); box-shadow: -30px 0 80px -30px rgba(0,0,0,.6); }
 .drawer.on { transform: none; }
 .drawer header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--line); }
@@ -323,6 +346,7 @@ b { font-weight: 700; }
     <button class="btn icon" id="logBtn" title="Registro de eventos (L)">☰</button>
     <button class="btn icon" id="openBtn" title="Abrir una traza (.json)">⇪</button>
     <button class="btn icon" id="themeBtn" title="Tema claro/oscuro (T)">◐</button>
+    <button class="btn" id="conclBtn" title="Conclusiones (C)">Conclusiones</button>
     <button class="btn icon" id="helpBtn" title="Bienvenida y atajos (?)">?</button>
     <input type="file" id="fileIn" accept=".json,application/json" hidden>
   </header>
@@ -458,10 +482,55 @@ b { font-weight: 700; }
     <h2>Mira al sistema operativo <em>coordinar hilos</em>, evento por evento.</h2>
     <p>Cada animación reproduce una ejecución <b>real</b> del programa: los bloqueos por mutex, los <code>wait</code> y <code>notify</code>, la sección crítica y la condición de carrera ocurrieron de verdad y se registraron con <code>--trace</code>.</p>
     <div class="choices">
+      <button class="choice" id="startStoryW" style="grid-column:1/-1;border-color:var(--amber)"><h4>★ Modo exposición: la historia de TicketClásica</h4><span>Empieza por el problema (la sobreventa), sigue con las soluciones y termina en las conclusiones.</span></button>
       <button class="choice lead" id="startGuided"><h4><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:-1px;margin-right:6px"><path d="M6 4v16l14-8z"/></svg>Recorrido guiado</h4><span>Se detiene en cada momento clave, lo ilumina y le hace una pregunta al público.</span></button>
       <button class="choice" id="startFree"><h4>Explorar libremente</h4><span>Reproduce, pausa y salta por la línea de tiempo a tu ritmo.</span></button>
     </div>
     <div class="keys"><span><kbd>Espacio</kbd>reproducir</span><span><kbd>Enter</kbd>siguiente momento</span><span><kbd>←</kbd><kbd>→</kbd>paso a paso</span><span><kbd>1</kbd>–<kbd>4</kbd>escenarios</span><span><kbd>G</kbd>guiado</span><span><kbd>F</kbd>pantalla completa</span></div>
+  </div>
+</div>
+<div class="overlay" id="story">
+  <div class="welcome story">
+    <div class="kick">Caso hipotético · «TicketClásica», una ticketera de las de antes</div>
+    <h2>Viernes, 10:00 a.&nbsp;m. <em>Abre la preventa.</em></h2>
+    <p>TicketClásica corre en <b>un solo servidor</b>: un hilo recibe los pedidos y los pone en una cola, y cuatro hilos cobran y descuentan del stock. Para que «vaya más rápido», alguien quitó el candado del contador de entradas.</p>
+    <div class="facts">
+      <div class="fact"><b>1</b><span>servidor</span></div>
+      <div class="fact"><b>4</b><span>hilos de cobro en paralelo</span></div>
+      <div class="fact"><b>20</b><span>entradas disponibles</span></div>
+      <div class="fact alert"><b>0</b><span>candados (mutex) en el stock</span></div>
+    </div>
+    <p class="ask">¿Qué puede salir mal si varios compradores llegan en el mismo milisegundo?</p>
+    <div class="choices">
+      <button class="choice lead" id="storyGo"><h4>Ver lo que pasó →</h4><span>Ejecución real del programa en C++ con --no-sync, reproducida evento por evento.</span></button>
+      <button class="choice" id="storySkip"><h4>Ir al visualizador</h4><span>Saltar la historia y explorar libremente.</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="concl">
+  <div class="welcome concl">
+    <div class="kick">Conclusiones</div>
+    <h2>De TicketClásica a las <em>ticketeras de hoy</em></h2>
+    <p>Las ticketeras actuales atienden a millones de personas con muchos servidores, pero enfrentan los mismos problemas que acabamos de ver. Cambia la escala, no la idea.</p>
+    <table class="cmp">
+      <thead><tr><th>Problema</th><th>TicketStorm · un servidor, varios hilos</th><th>Ticketeras actuales · muchos servidores</th></tr></thead>
+      <tbody>
+        <tr><td>Llegan más compradores de los que se pueden atender</td><td class="ours"><span class="tag">escenario 1</span><br>Cola acotada: si está llena, el productor espera en <code>notFull</code> sin gastar CPU.</td><td>Sala de espera virtual: te ponen en una fila y entras por turnos.</td></tr>
+        <tr><td>Dos compradores, una sola entrada</td><td class="ours"><span class="tag">escenario 2</span><br>Mutex: verificar y descontar ocurren juntos, sin interrupciones.</td><td>Transacciones y bloqueo de la fila del asiento en la base de datos.</td></tr>
+        <tr><td>Mucha competencia por el mismo dato</td><td class="ours"><span class="tag">escenario 3</span><br>CAS: «descuenta solo si nadie lo cambió»; si falla, reintenta.</td><td>Control optimista de concurrencia y contadores atómicos compartidos.</td></tr>
+        <tr><td>Sin sincronización</td><td class="ours"><span class="tag">escenario 4</span><br>21 entradas vendidas de 20, solo en algunas ejecuciones.</td><td>Sobreventa entre servidores: el mismo error, a mayor escala.</td></tr>
+      </tbody>
+    </table>
+    <div class="cl">
+      <div><b>El problema es real y silencioso:</b> sin sincronización hubo sobreventa en 5 de 20 ejecuciones. Un sistema puede pasar muchas pruebas y fallar el día de la preventa.</div>
+      <div><b>La causa es una sola:</b> verificar el stock y descontarlo no eran una operación indivisible (patrón verificar-y-luego-actuar).</div>
+      <div><b>La solución funciona:</b> con mutex y variables de condición, 0 sobreventas en 20 ejecuciones intensivas, y los hilos en espera no consumieron CPU.</div>
+      <div><b>No hay solución gratis:</b> el modo atómico también fue correcto, pero con mucha competencia fue más lento que el mutex. La técnica depende de la carga.</div>
+      <div class="wide"><b>La idea escala:</b> lo que resolvimos con un mutex en un proceso es lo que una ticketera moderna resuelve con colas, bloqueos y operaciones atómicas entre muchos servidores. Para TicketClásica, nuestra solución es suficiente; para una ticketera masiva, es el fundamento.</div>
+    </div>
+    <div class="cfoot"><span class="note">Caso hipotético con fines didácticos. Los datos de TicketStorm provienen de ejecuciones reales del programa (ver informe).</span><span class="grow"></span>
+      <button class="btn" id="conclBack">Volver al visualizador</button><button class="btn primary" id="conclRestart">Repetir desde la historia</button></div>
   </div>
 </div>
 <div class="drop" id="drop">Suelta aquí una traza .json</div>
@@ -703,6 +772,9 @@ function findMoments(M) {
    Vista
    ===================================================================== */
 let M = null, idx = -1, playing = false, timer = null, guided = false, moments = [], calloutOpen = false, currentKey = "basico";
+// Orden del recorrido: normal (1→4) o narrativo (problema primero: 4→1→2→3) en modo historia.
+let tourOrder = ["basico", "mutex", "atomic", "nosync"];
+const nextScenario = () => { const k = tourOrder.indexOf(currentKey); return k >= 0 && k < tourOrder.length - 1 ? SCENARIOS.find((s) => s.key === tourOrder[k + 1]) : null; };
 const stepMs = () => 760 / parseFloat($("speed").value);
 
 const ticketHTML = (r) => r ? `<span class="ticket q${r.qty}" title="Petición #${r.id}: usuario ${r.user}, ${r.qty} entrada(s)"><span class="id">#${r.id}</span><span class="q">u${r.user}<i>${r.qty}</i></span></span>` : "";
@@ -939,7 +1011,7 @@ function setGuided(on) {
 function continueTour() {
   hideCallout();
   const i = moments.findIndex((m) => m.idx === idx);
-  if (i === moments.length - 1) { const k = SCENARIOS.findIndex((s) => s.key === currentKey); if (k >= 0 && k < SCENARIOS.length - 1) { loadScenario(SCENARIOS[k + 1].key); if (guided) play(); } return; }
+  if (i === moments.length - 1) { const nx = nextScenario(); if (nx) { loadScenario(nx.key); if (guided) play(); } else showConclusions(); return; }
   play();
 }
 function gotoMoment(i) {
@@ -951,8 +1023,8 @@ function showMoment(m) {
   if (!target) return;
   calloutOpen = true;
   const i = moments.indexOf(m), last = i === moments.length - 1;
-  const k = SCENARIOS.findIndex((s) => s.key === currentKey);
-  const nextLabel = last ? (k >= 0 && k < SCENARIOS.length - 1 ? `Siguiente escenario: ${SCENARIOS[k + 1].title} →` : "Fin del recorrido ✓") : "Continuar →";
+  const nx = nextScenario();
+  const nextLabel = last ? (nx ? `Siguiente: ${nx.title} →` : "Ver conclusiones →") : "Continuar →";
   const c = $("callout");
   c.innerHTML = `<div class="step">Momento ${i + 1} de ${moments.length} · <span style="color:var(${conceptColor(m.tag)})">${esc(m.tag)}</span></div>
     <h3>${esc(m.title)}</h3><div class="ct">${m.text}</div>
@@ -1055,7 +1127,19 @@ $("fileIn").onchange = (ev) => ev.target.files[0] && loadFile(ev.target.files[0]
 function setTheme(t) { document.documentElement.dataset.theme = t; ganttCache = null; if (M) drawGantt(); try { localStorage.setItem("ts-theme", t); } catch {} }
 $("themeBtn").onclick = () => setTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
 $("helpBtn").onclick = () => $("welcome").classList.add("on");
+function showConclusions() { pause(); hideCallout(); $("concl").classList.add("on"); }
+function startStory() {
+  $("story").classList.remove("on"); $("concl").classList.remove("on"); $("welcome").classList.remove("on");
+  tourOrder = ["nosync", "basico", "mutex", "atomic"];
+  loadScenario("nosync"); setGuided(true); play();
+}
+$("conclBtn").onclick = showConclusions;
+$("conclBack").onclick = () => $("concl").classList.remove("on");
+$("conclRestart").onclick = () => { $("concl").classList.remove("on"); $("story").classList.add("on"); };
+$("storyGo").onclick = startStory;
+$("storySkip").onclick = () => $("story").classList.remove("on");
 $("startGuided").onclick = () => { $("welcome").classList.remove("on"); setGuided(true); seek(-1); play(); };
+$("startStoryW").onclick = startStory;
 $("startFree").onclick = () => { $("welcome").classList.remove("on"); setGuided(false); };
 $("welcome").onclick = (ev) => { if (ev.target.id === "welcome") $("welcome").classList.remove("on"); };
 window.addEventListener("resize", () => { ganttCache = null; if (M) drawGantt(); if (calloutOpen) { const m = moments.find((m) => m.idx === idx); if (m) placeSpot(m.target === "verdict" ? $("verdict") : $(m.target)); } });
@@ -1069,6 +1153,8 @@ window.addEventListener("keydown", (ev) => {
   if (ev.target.tagName === "SELECT" || (ev.target.tagName === "INPUT" && ev.target.type !== "checkbox")) return;
   const k = ev.key;
   if ($("welcome").classList.contains("on") && k !== "Escape" && k !== "Enter") return;
+  if ($("story").classList.contains("on")) { if (k === "Enter" || k === " ") { ev.preventDefault(); startStory(); } else if (k === "Escape") $("story").classList.remove("on"); return; }
+  if ($("concl").classList.contains("on")) { if (k === "Escape" || k === "c" || k === "C") $("concl").classList.remove("on"); return; }
   if (k === " ") { ev.preventDefault(); toggle(); }
   else if (k === "Enter") { ev.preventDefault(); if ($("welcome").classList.contains("on")) $("startGuided").click(); else if (calloutOpen) continueTour(); else { if (!guided) setGuided(true); const n = moments.findIndex((m) => m.idx > idx); if (n >= 0) gotoMoment(n); } }
   else if (k === "ArrowRight") { ev.preventDefault(); pause(); hideCallout(); step(); }
@@ -1082,6 +1168,7 @@ window.addEventListener("keydown", (ev) => {
   else if (k === "f" || k === "F") { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.(); }
   else if (k === "t" || k === "T") $("themeBtn").click();
   else if (k === "?") $("welcome").classList.add("on");
+  else if (k === "c" || k === "C") showConclusions();
   else if (k === "Escape") { $("welcome").classList.remove("on"); $("drawer").classList.remove("on"); hideCallout(); }
 });
 
@@ -1100,7 +1187,9 @@ window.addEventListener("keydown", (ev) => {
     setGuided(true);
     if (+m[3] > 0) setTimeout(() => gotoMoment(+m[3] - 1), 60);
   }
-  else if (!h && !qp.has("nowelcome")) $("welcome").classList.add("on");
+  else if (!h && !qp.has("nowelcome") && !qp.has("story")) $("welcome").classList.add("on");
+  if (qp.has("story")) $("story").classList.add("on");       // exponer.html: abre con la historia
+  if (qp.has("conclusiones")) $("concl").classList.add("on");
 })();
 </script>
 </body>
