@@ -4,3 +4,4 @@ Makefile text eol=lf
 *.docx binary
 *.pdf binary
 *.png binary
+*.woff2 binary
