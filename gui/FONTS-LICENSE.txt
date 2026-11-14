@@ -1,0 +1,7 @@
+Fuentes incrustadas en gui/index.html (como data URI, subconjunto latino):
+
+- Bricolage Grotesque — Copyright The Bricolage Grotesque Project Authors.
+- JetBrains Mono — Copyright The JetBrains Mono Project Authors.
+
+Ambas se distribuyen bajo la SIL Open Font License 1.1: https://openfontlicense.org
+Obtenidas del paquete Fontsource (https://fontsource.org).
