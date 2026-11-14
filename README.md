@@ -15,7 +15,7 @@ más un **visualizador animado** que reproduce paso a paso lo que hizo el progra
 
 ## Visualizador (para la exposición)
 
-Abre [`gui/index.html`](gui/index.html) en el navegador (funciona sin internet). Incluye cuatro escenarios:
+Abre [`gui/index.html`](gui/index.html) en el navegador (funciona sin internet, las fuentes van incluidas) y elige **Recorrido guiado**: la animación se detiene en cada momento clave, ilumina lo que se explica y lanza una **pregunta al público**. A la derecha, un **diagrama de estados** muestra a cada hilo moviéndose entre Ejecutable, Bloqueado y Durmiendo. Incluye cuatro escenarios:
 
 | Tecla | Escenario | Concepto de SO |
 |---|---|---|
@@ -24,8 +24,8 @@ Abre [`gui/index.html`](gui/index.html) en el navegador (funciona sin internet).
 | `3` | Atómico (CAS) | Sincronización sin cerrojo, reintentos |
 | `4` | Sin sincronización | Condición de carrera y sobreventa |
 
-Atajos: `Espacio` reproducir/pausa · `←` `→` paso a paso · `+` `−` velocidad · `F` pantalla completa · `T` tema · `?` ayuda.
-Enlace directo a un evento: `gui/index.html#nosync@83`. Para una traza propia:
+Atajos: `Enter` siguiente momento clave · `G` modo guiado · `Espacio` reproducir/pausa · `←` `→` paso a paso · `+` `−` velocidad · `F` pantalla completa · `T` tema · `?` ayuda.
+Enlaces directos: `gui/index.html#nosync@83` (evento) o `gui/index.html#nosync!1` (momento guiado). Para una traza propia:
 
 ```bash
 ./ticketstorm --trace demo.json -w 4 -t 20 -r 16   # luego arrastra demo.json al visualizador
