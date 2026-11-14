@@ -281,7 +281,7 @@ b { font-weight: 700; }
 .choice { text-align: left; border: 1.5px solid var(--line2); background: var(--panel2); border-radius: 18px; padding: 16px; cursor: pointer; transition: .2s; display: grid; gap: 6px; align-content: start; }
 .choice span { display: block; line-height: 1.35; }
 .choice:hover { border-color: var(--amber); transform: translateY(-2px); }
-.choice.main { background: var(--amber); border-color: var(--amber); color: var(--amber-ink); }
+.choice.lead { background: var(--amber); border-color: var(--amber); color: var(--amber-ink); }
 .choice h4 { margin: 0 0 4px; font: 800 19px/1.1 var(--display); }
 .choice span { font-size: 13.5px; opacity: .8; }
 .keys { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 18px; font-size: 12.5px; color: var(--ink3); }
@@ -458,7 +458,7 @@ b { font-weight: 700; }
     <h2>Mira al sistema operativo <em>coordinar hilos</em>, evento por evento.</h2>
     <p>Cada animación reproduce una ejecución <b>real</b> del programa: los bloqueos por mutex, los <code>wait</code> y <code>notify</code>, la sección crítica y la condición de carrera ocurrieron de verdad y se registraron con <code>--trace</code>.</p>
     <div class="choices">
-      <button class="choice main" id="startGuided"><h4>▶ Recorrido guiado</h4><span>Se detiene en cada momento clave, lo ilumina y le hace una pregunta al público.</span></button>
+      <button class="choice lead" id="startGuided"><h4><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:-1px;margin-right:6px"><path d="M6 4v16l14-8z"/></svg>Recorrido guiado</h4><span>Se detiene en cada momento clave, lo ilumina y le hace una pregunta al público.</span></button>
       <button class="choice" id="startFree"><h4>Explorar libremente</h4><span>Reproduce, pausa y salta por la línea de tiempo a tu ritmo.</span></button>
     </div>
     <div class="keys"><span><kbd>Espacio</kbd>reproducir</span><span><kbd>Enter</kbd>siguiente momento</span><span><kbd>←</kbd><kbd>→</kbd>paso a paso</span><span><kbd>1</kbd>–<kbd>4</kbd>escenarios</span><span><kbd>G</kbd>guiado</span><span><kbd>F</kbd>pantalla completa</span></div>
